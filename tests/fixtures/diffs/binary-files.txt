@@ -1,0 +1,13 @@
+diff --git a/assets/logo.png b/assets/logo.png
+new file mode 100644
+index 0000000..bbb8888
+Binary files /dev/null and b/assets/logo.png differ
+diff --git a/src/app.ts b/src/app.ts
+index ccc9999..ddd0000 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,3 +1,4 @@
+ import { start } from "./server";
++import logo from "../assets/logo.png";
+ 
+ start();

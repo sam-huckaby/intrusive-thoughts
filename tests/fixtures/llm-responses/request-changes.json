@@ -1,0 +1,30 @@
+{
+  "verdict": "request_changes",
+  "summary": "Several critical issues found. The authentication middleware has a bypass vulnerability, input validation is missing on the user endpoint, and there are unhandled promise rejections.",
+  "comments": [
+    {
+      "file": "src/auth/middleware.ts",
+      "line": 23,
+      "severity": "critical",
+      "comment": "The JWT verification can be bypassed by sending an empty token. Add a check for empty/null tokens before calling verify()."
+    },
+    {
+      "file": "src/api/users.ts",
+      "line": 45,
+      "severity": "critical",
+      "comment": "User input is passed directly to the SQL query without parameterized binding. This is a SQL injection vulnerability."
+    },
+    {
+      "file": "src/api/users.ts",
+      "line": 12,
+      "severity": "warning",
+      "comment": "The async route handler does not have a try/catch block. Unhandled rejections will crash the server."
+    }
+  ],
+  "suggestions": [
+    "Use parameterized queries for all database operations.",
+    "Add rate limiting to the authentication endpoints.",
+    "Consider using a validation library like Zod for request body validation."
+  ],
+  "confidence": 0.88
+}

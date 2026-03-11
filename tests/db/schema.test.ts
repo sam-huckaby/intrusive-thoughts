@@ -1,0 +1,107 @@
+import { describe, it, expect } from "bun:test";
+import { Database } from "bun:sqlite";
+import { applySchema } from "../../src/db/schema";
+
+function getTableNames(db: Database): string[] {
+  const rows = db
+    .query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+    .all() as Array<{ name: string }>;
+  return rows.map((r) => r.name);
+}
+
+function getColumns(db: Database, table: string): Array<{ name: string; type: string; notnull: number }> {
+  return db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string; type: string; notnull: number }>;
+}
+
+describe("applySchema", () => {
+  it("creates all four tables", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const tables = getTableNames(db);
+    expect(tables).toContain("rules");
+    expect(tables).toContain("config");
+    expect(tables).toContain("reviews");
+    expect(tables).toContain("schema_version");
+  });
+
+  it("is idempotent — calling twice does not error", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    applySchema(db);
+    const tables = getTableNames(db);
+    expect(tables).toContain("rules");
+  });
+
+  it("rules table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "rules");
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("id");
+    expect(names).toContain("name");
+    expect(names).toContain("description");
+    expect(names).toContain("category");
+    expect(names).toContain("severity");
+    expect(names).toContain("enabled");
+    expect(names).toContain("created_at");
+    expect(names).toContain("updated_at");
+  });
+
+  it("rules table enforces NOT NULL on name", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    expect(() => {
+      db.run("INSERT INTO rules (description) VALUES ('test')");
+    }).toThrow();
+  });
+
+  it("rules table enforces NOT NULL on description", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    expect(() => {
+      db.run("INSERT INTO rules (name) VALUES ('test')");
+    }).toThrow();
+  });
+
+  it("config table has key as primary key", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    db.run("INSERT INTO config (key, value) VALUES ('test', 'value')");
+    expect(() => {
+      db.run("INSERT INTO config (key, value) VALUES ('test', 'other')");
+    }).toThrow();
+  });
+
+  it("reviews table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "reviews");
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("id");
+    expect(names).toContain("task_summary");
+    expect(names).toContain("base_branch");
+    expect(names).toContain("verdict");
+    expect(names).toContain("result_json");
+    expect(names).toContain("files_reviewed");
+    expect(names).toContain("provider");
+    expect(names).toContain("model");
+    expect(names).toContain("chunks_used");
+    expect(names).toContain("created_at");
+  });
+
+  it("rules table defaults enabled to 1", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    db.run("INSERT INTO rules (name, description) VALUES ('test', 'desc')");
+    const row = db.query("SELECT enabled FROM rules WHERE name = 'test'").get() as { enabled: number };
+    expect(row.enabled).toBe(1);
+  });
+
+  it("rules table defaults category to general", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    db.run("INSERT INTO rules (name, description) VALUES ('test', 'desc')");
+    const row = db.query("SELECT category FROM rules WHERE name = 'test'").get() as { category: string };
+    expect(row.category).toBe("general");
+  });
+});

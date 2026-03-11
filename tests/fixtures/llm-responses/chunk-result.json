@@ -1,0 +1,21 @@
+{
+  "chunkId": 0,
+  "comments": [
+    {
+      "file": "src/auth/login.ts",
+      "line": 15,
+      "severity": "warning",
+      "comment": "Password comparison should use a constant-time comparison function to prevent timing attacks."
+    },
+    {
+      "file": "src/auth/session.ts",
+      "line": 8,
+      "severity": "suggestion",
+      "comment": "Session expiration should be configurable rather than hardcoded to 3600 seconds."
+    }
+  ],
+  "issues": [
+    "No rate limiting on login attempts",
+    "Session tokens are stored in plain text"
+  ]
+}

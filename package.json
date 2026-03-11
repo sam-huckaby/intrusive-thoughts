@@ -1,0 +1,41 @@
+{
+  "name": "intrusive-thoughts",
+  "version": "0.1.0",
+  "description": "AI-powered code review tool — MCP server, CLI, and web UI",
+  "type": "module",
+  "bin": {
+    "intrusive-thoughts": "./bin/intrusive-thoughts.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts serve",
+    "dev:web": "vite --config vite.config.ts",
+    "mcp": "bun run src/index.ts mcp",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "build:web": "vite build --config vite.config.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "openai": "^4.77.0",
+    "simple-git": "^3.27.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@types/bun": "^1.2.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/supertest": "^6.0.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "supertest": "^7.0.0",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
