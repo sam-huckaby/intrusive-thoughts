@@ -61,7 +61,7 @@ export function ConfigPage() {
                 onChange={(e) => setForm({ ...form, maxDiffLines: e.target.value })}
               />
             </FormField>
-            <FormField label="Chunk Size">
+            <FormField label="Max Files Per Chunk">
               <input
                 type="number"
                 value={form.chunkSize ?? ""}
