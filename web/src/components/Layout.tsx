@@ -38,9 +38,9 @@ function BrandHeader() {
   return (
     <div className="border-b border-slate-700/50 px-5 py-5">
       <h1 className="text-sm font-semibold tracking-wide text-white">
-        intrusive-thoughts
+        Intrusive Thoughts
       </h1>
-      <p className="mt-0.5 text-xs text-slate-400">AI Code Review</p>
+      <p className="mt-0.5 text-xs text-slate-400">Let the voices guide you</p>
     </div>
   );
 }

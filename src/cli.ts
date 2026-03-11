@@ -9,7 +9,7 @@ export interface ParsedArgs {
 }
 
 const HELP_TEXT = `
-intrusive-thoughts — AI Code Review Tool
+intrusive-thoughts — AI Code Review Tool (let the voices guide you)
 
 Usage:
   intrusive-thoughts review --summary "..." [--base main] [--dir /path]
