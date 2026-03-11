@@ -1,1 +1,81 @@
 @import "tailwindcss";
+
+/*
+ * Base styles for the intrusive-thoughts web UI.
+ * Paper-inspired light theme with dark slate sidebar.
+ */
+
+@layer base {
+  body {
+    @apply bg-stone-50 text-stone-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Form element resets */
+  input[type="text"],
+  input[type="number"],
+  textarea,
+  select {
+    @apply rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900
+           placeholder:text-stone-400
+           focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-1
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  textarea {
+    @apply resize-y;
+  }
+
+  /* Label styling */
+  label {
+    @apply block text-sm font-medium text-stone-700;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: animateIn 150ms ease-out;
+  }
+
+  .animate-out {
+    animation: animateOut 150ms ease-in;
+  }
+
+  .fade-in-0 {
+    --tw-enter-opacity: 0;
+  }
+
+  .zoom-in-95 {
+    --tw-enter-scale: 0.95;
+  }
+
+  .fade-out-0 {
+    --tw-exit-opacity: 0;
+  }
+
+  .zoom-out-95 {
+    --tw-exit-scale: 0.95;
+  }
+
+  @keyframes animateIn {
+    from {
+      opacity: var(--tw-enter-opacity, 1);
+      transform: scale(var(--tw-enter-scale, 1));
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes animateOut {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: var(--tw-exit-opacity, 1);
+      transform: scale(var(--tw-exit-scale, 1));
+    }
+  }
+}

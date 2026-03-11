@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useApi, apiPost, apiDelete, apiPatch, apiPut } from "../hooks/useApi";
 import { RuleForm } from "./RuleForm";
+import { Button } from "./ui/Button";
+import { CategoryBadge, SeverityBadge } from "./ui/Badge";
+import { Switch } from "./ui/Switch";
+import { Card } from "./ui/Card";
+import { Dialog, DialogTitle, DialogDescription } from "./ui/Dialog";
 
 interface Rule {
   id: number;
@@ -16,65 +21,174 @@ export function RulesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
-  if (loading) return <p className="text-gray-500">Loading rules...</p>;
+  if (loading) return <LoadingState />;
+
+  function openCreate() {
+    setEditingRule(null);
+    setShowForm(true);
+  }
+
+  function openEdit(rule: Rule) {
+    setEditingRule(rule);
+    setShowForm(true);
+  }
+
+  async function handleSubmit(data: { name: string; description: string; category: string; severity: string }) {
+    if (editingRule) {
+      await apiPut(`/api/rules/${editingRule.id}`, data);
+    } else {
+      await apiPost("/api/rules", data);
+    }
+    setShowForm(false);
+    refetch();
+  }
 
   return (
     <div>
-      <Header onAdd={() => { setEditingRule(null); setShowForm(true); }} />
-      {showForm && (
+      <PageHeader onAdd={openCreate} />
+      <RuleFormDialog
+        open={showForm}
+        onOpenChange={setShowForm}
+        editingRule={editingRule}
+        onSubmit={handleSubmit}
+        onCancel={() => setShowForm(false)}
+      />
+      <RulesTable
+        rules={rules ?? []}
+        onEdit={openEdit}
+        onDelete={async (id) => { await apiDelete(`/api/rules/${id}`); refetch(); }}
+        onToggle={async (id) => { await apiPatch(`/api/rules/${id}/toggle`); refetch(); }}
+      />
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex items-center gap-2 text-sm text-stone-400">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+      Loading rules...
+    </div>
+  );
+}
+
+function PageHeader({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="mb-6 flex items-center justify-between">
+      <div>
+        <h2 className="text-xl font-semibold text-stone-900">Review Rules</h2>
+        <p className="mt-1 text-sm text-stone-500">
+          Rules are injected into every review prompt to guide the AI reviewer.
+        </p>
+      </div>
+      <Button onClick={onAdd}>Add Rule</Button>
+    </div>
+  );
+}
+
+interface RuleFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingRule: Rule | null;
+  onSubmit: (data: { name: string; description: string; category: string; severity: string }) => void;
+  onCancel: () => void;
+}
+
+function RuleFormDialog({ open, onOpenChange, editingRule, onSubmit, onCancel }: RuleFormDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTitle>{editingRule ? "Edit Rule" : "Create Rule"}</DialogTitle>
+      <DialogDescription>
+        {editingRule ? "Update the rule details below." : "Define a new review guideline."}
+      </DialogDescription>
+      <div className="mt-4">
         <RuleForm
           initial={editingRule ? { name: editingRule.name, description: editingRule.description, category: editingRule.category, severity: editingRule.severity } : undefined}
-          onSubmit={async (data) => {
-            if (editingRule) {
-              await apiPut(`/api/rules/${editingRule.id}`, data);
-            } else {
-              await apiPost("/api/rules", data);
-            }
-            setShowForm(false);
-            refetch();
-          }}
-          onCancel={() => setShowForm(false)}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
         />
-      )}
-      <RulesTable rules={rules ?? []} onEdit={(r) => { setEditingRule(r); setShowForm(true); }} onDelete={async (id) => { await apiDelete(`/api/rules/${id}`); refetch(); }} onToggle={async (id) => { await apiPatch(`/api/rules/${id}/toggle`); refetch(); }} />
-    </div>
+      </div>
+    </Dialog>
   );
 }
 
-function Header({ onAdd }: { onAdd: () => void }) {
+interface RulesTableProps {
+  rules: Rule[];
+  onEdit: (r: Rule) => void;
+  onDelete: (id: number) => void;
+  onToggle: (id: number) => void;
+}
+
+function RulesTable({ rules, onEdit, onDelete, onToggle }: RulesTableProps) {
+  if (rules.length === 0) return <EmptyState />;
   return (
-    <div className="flex justify-between items-center mb-6">
-      <h2 className="text-2xl font-bold">Review Rules</h2>
-      <button onClick={onAdd} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Add Rule</button>
-    </div>
+    <Card>
+      <table className="w-full text-sm">
+        <TableHead />
+        <tbody className="divide-y divide-stone-100">
+          {rules.map((rule) => (
+            <RuleRow key={rule.id} rule={rule} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} />
+          ))}
+        </tbody>
+      </table>
+    </Card>
   );
 }
 
-function RulesTable({ rules, onEdit, onDelete, onToggle }: { rules: Rule[]; onEdit: (r: Rule) => void; onDelete: (id: number) => void; onToggle: (id: number) => void }) {
+function TableHead() {
   return (
-    <table className="w-full bg-white rounded border text-sm">
-      <thead><tr className="border-b bg-gray-50"><th className="p-3 text-left">Name</th><th className="p-3 text-left">Category</th><th className="p-3 text-left">Severity</th><th className="p-3 text-left">Enabled</th><th className="p-3 text-left">Actions</th></tr></thead>
-      <tbody>
-        {rules.map((rule) => (
-          <tr key={rule.id} className="border-b hover:bg-gray-50">
-            <td className="p-3 font-medium">{rule.name}</td>
-            <td className="p-3"><Badge text={rule.category} color="blue" /></td>
-            <td className="p-3"><SeverityBadge severity={rule.severity} /></td>
-            <td className="p-3"><button onClick={() => onToggle(rule.id)} className={`px-2 py-1 rounded text-xs ${rule.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`}>{rule.enabled ? "On" : "Off"}</button></td>
-            <td className="p-3 space-x-2"><button onClick={() => onEdit(rule)} className="text-blue-600 hover:underline text-xs">Edit</button><button onClick={() => onDelete(rule.id)} className="text-red-600 hover:underline text-xs">Delete</button></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <thead>
+      <tr className="border-b border-stone-200 bg-stone-50/60 text-left text-xs font-medium uppercase tracking-wider text-stone-400">
+        <th className="px-5 py-3">Rule</th>
+        <th className="px-5 py-3">Category</th>
+        <th className="px-5 py-3">Severity</th>
+        <th className="px-5 py-3">Enabled</th>
+        <th className="px-5 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
   );
 }
 
-function Badge({ text, color }: { text: string; color: string }) {
-  return <span className={`px-2 py-0.5 rounded text-xs bg-${color}-100 text-${color}-800`}>{text}</span>;
+interface RuleRowProps {
+  rule: Rule;
+  onEdit: (r: Rule) => void;
+  onDelete: (id: number) => void;
+  onToggle: (id: number) => void;
 }
 
-function SeverityBadge({ severity }: { severity: string }) {
-  const colors: Record<string, string> = { critical: "red", warning: "yellow", suggestion: "gray" };
-  const color = colors[severity] ?? "gray";
-  return <Badge text={severity} color={color} />;
+function RuleRow({ rule, onEdit, onDelete, onToggle }: RuleRowProps) {
+  return (
+    <tr className="group transition-colors hover:bg-stone-50/80">
+      <td className="px-5 py-3.5">
+        <span className="font-medium text-stone-800">{rule.name}</span>
+        <p className="mt-0.5 text-xs text-stone-400 line-clamp-1">{rule.description}</p>
+      </td>
+      <td className="px-5 py-3.5">
+        <CategoryBadge category={rule.category} />
+      </td>
+      <td className="px-5 py-3.5">
+        <SeverityBadge severity={rule.severity} />
+      </td>
+      <td className="px-5 py-3.5">
+        <Switch checked={rule.enabled === 1} onCheckedChange={() => onToggle(rule.id)} />
+      </td>
+      <td className="px-5 py-3.5 text-right">
+        <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button variant="ghost" size="sm" onClick={() => onEdit(rule)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => onDelete(rule.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function EmptyState() {
+  return (
+    <Card className="flex flex-col items-center justify-center py-16 text-center">
+      <p className="text-sm font-medium text-stone-500">No rules yet</p>
+      <p className="mt-1 text-xs text-stone-400">
+        Add review rules to guide the AI code reviewer.
+      </p>
+    </Card>
+  );
 }

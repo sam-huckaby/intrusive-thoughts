@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
 import { useApi, apiPut } from "../hooks/useApi";
+import { Button } from "./ui/Button";
+import { Select } from "./ui/Select";
+import { Card, CardBody } from "./ui/Card";
+
+const PROVIDERS = [
+  { value: "anthropic", label: "Anthropic" },
+  { value: "openai", label: "OpenAI" },
+];
 
 export function ConfigPage() {
   const { data, loading, refetch } = useApi<Record<string, string>>("/api/config");
@@ -8,7 +16,7 @@ export function ConfigPage() {
 
   useEffect(() => { if (data) setForm(data); }, [data]);
 
-  if (loading) return <p className="text-gray-500">Loading config...</p>;
+  if (loading) return <LoadingState />;
 
   async function handleSave() {
     await apiPut("/api/config", form);
@@ -19,57 +27,117 @@ export function ConfigPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Configuration</h2>
-      <div className="bg-white rounded border p-6 space-y-4 max-w-lg">
-        <SelectField label="Provider" value={form.provider ?? ""} options={["anthropic", "openai"]} onChange={(v) => setForm({ ...form, provider: v })} />
-        <TextField label="Model" value={form.model ?? ""} onChange={(v) => setForm({ ...form, model: v })} />
-        <TextField label="Base Branch" value={form.baseBranch ?? ""} onChange={(v) => setForm({ ...form, baseBranch: v })} />
-        <NumberField label="Max Diff Lines" value={form.maxDiffLines ?? ""} onChange={(v) => setForm({ ...form, maxDiffLines: v })} />
-        <NumberField label="Chunk Size" value={form.chunkSize ?? ""} onChange={(v) => setForm({ ...form, chunkSize: v })} />
-        <NumberField label="HTTP Port" value={form.httpPort ?? ""} onChange={(v) => setForm({ ...form, httpPort: v })} />
-        <EnvNote />
-        <div className="flex items-center gap-3">
-          <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
-          {saved && <span className="text-green-600 text-sm">Saved!</span>}
-        </div>
-      </div>
+      <PageHeader />
+      <Card className="max-w-lg">
+        <CardBody className="space-y-5">
+          <FormField label="Provider">
+            <Select
+              value={form.provider ?? ""}
+              onValueChange={(v) => setForm({ ...form, provider: v })}
+              options={PROVIDERS}
+            />
+          </FormField>
+          <FormField label="Model">
+            <input
+              type="text"
+              value={form.model ?? ""}
+              onChange={(e) => setForm({ ...form, model: e.target.value })}
+              placeholder="e.g. claude-sonnet-4-20250514"
+            />
+          </FormField>
+          <FormField label="Base Branch">
+            <input
+              type="text"
+              value={form.baseBranch ?? ""}
+              onChange={(e) => setForm({ ...form, baseBranch: e.target.value })}
+              placeholder="e.g. main"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Max Diff Lines">
+              <input
+                type="number"
+                value={form.maxDiffLines ?? ""}
+                onChange={(e) => setForm({ ...form, maxDiffLines: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Chunk Size">
+              <input
+                type="number"
+                value={form.chunkSize ?? ""}
+                onChange={(e) => setForm({ ...form, chunkSize: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <FormField label="HTTP Port">
+            <input
+              type="number"
+              value={form.httpPort ?? ""}
+              onChange={(e) => setForm({ ...form, httpPort: e.target.value })}
+            />
+          </FormField>
+          <EnvNote />
+          <div className="flex items-center gap-3 pt-1">
+            <Button onClick={handleSave}>Save Configuration</Button>
+            <SavedIndicator visible={saved} />
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function LoadingState() {
   return (
-    <label className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full rounded border-gray-300 border px-3 py-2 text-sm" />
-    </label>
+    <div className="flex items-center gap-2 text-sm text-stone-400">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+      Loading configuration...
+    </div>
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function PageHeader() {
   return (
-    <label className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <input type="number" value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full rounded border-gray-300 border px-3 py-2 text-sm" />
-    </label>
+    <div className="mb-6">
+      <h2 className="text-xl font-semibold text-stone-900">Configuration</h2>
+      <p className="mt-1 text-sm text-stone-500">
+        Manage the LLM provider, model, and review settings.
+      </p>
+    </div>
   );
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full rounded border-gray-300 border px-3 py-2 text-sm">
-        {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    </label>
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-stone-700">{label}</label>
+      {children}
+    </div>
   );
 }
 
 function EnvNote() {
   return (
-    <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-      API keys are read from environment variables at runtime: <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code>. They are never stored in the database.
-    </p>
+    <div className="rounded-md bg-stone-50 p-3 ring-1 ring-stone-200">
+      <p className="text-xs leading-relaxed text-stone-500">
+        API keys are read from environment variables at runtime:
+        <code className="mx-1 rounded bg-stone-100 px-1 py-0.5 font-mono text-stone-600">ANTHROPIC_API_KEY</code>
+        or
+        <code className="mx-1 rounded bg-stone-100 px-1 py-0.5 font-mono text-stone-600">OPENAI_API_KEY</code>.
+        They are never stored in the database.
+      </p>
+    </div>
+  );
+}
+
+function SavedIndicator({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <span className="flex items-center gap-1.5 text-sm text-emerald-600">
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      Saved
+    </span>
   );
 }

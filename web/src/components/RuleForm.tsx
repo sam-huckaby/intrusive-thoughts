@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "./ui/Button";
+import { Select } from "./ui/Select";
 
 interface RuleFormData {
   name: string;
@@ -13,8 +15,20 @@ interface RuleFormProps {
   onCancel: () => void;
 }
 
-const CATEGORIES = ["general", "style", "security", "performance", "architecture", "maintainability"];
-const SEVERITIES = ["critical", "warning", "suggestion"];
+const CATEGORIES = [
+  { value: "general", label: "General" },
+  { value: "style", label: "Style" },
+  { value: "security", label: "Security" },
+  { value: "performance", label: "Performance" },
+  { value: "architecture", label: "Architecture" },
+  { value: "maintainability", label: "Maintainability" },
+];
+
+const SEVERITIES = [
+  { value: "critical", label: "Critical" },
+  { value: "warning", label: "Warning" },
+  { value: "suggestion", label: "Suggestion" },
+];
 
 export function RuleForm({ initial, onSubmit, onCancel }: RuleFormProps) {
   const [form, setForm] = useState<RuleFormData>(
@@ -27,44 +41,54 @@ export function RuleForm({ initial, onSubmit, onCancel }: RuleFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 bg-white p-4 rounded border">
-      <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
-      <TextArea label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
-      <Select label="Category" value={form.category} options={CATEGORIES} onChange={(v) => setForm({ ...form, category: v })} />
-      <Select label="Severity" value={form.severity} options={SEVERITIES} onChange={(v) => setForm({ ...form, severity: v })} />
-      <div className="flex gap-2">
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
-        <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300">Cancel</button>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <FormField label="Name">
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder="Rule name"
+          required
+        />
+      </FormField>
+      <FormField label="Description">
+        <textarea
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          rows={3}
+          placeholder="What should this rule check for?"
+          required
+        />
+      </FormField>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Category">
+          <Select
+            value={form.category}
+            onValueChange={(v) => setForm({ ...form, category: v })}
+            options={CATEGORIES}
+          />
+        </FormField>
+        <FormField label="Severity">
+          <Select
+            value={form.severity}
+            onValueChange={(v) => setForm({ ...form, severity: v })}
+            options={SEVERITIES}
+          />
+        </FormField>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Button type="submit">Save Rule</Button>
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
       </div>
     </form>
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full rounded border-gray-300 border px-3 py-2 text-sm" required />
-    </label>
-  );
-}
-
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className="mt-1 block w-full rounded border-gray-300 border px-3 py-2 text-sm" required />
-    </label>
-  );
-}
-
-function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
-  return (
-    <label className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full rounded border-gray-300 border px-3 py-2 text-sm">
-        {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    </label>
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-stone-700">{label}</label>
+      {children}
+    </div>
   );
 }

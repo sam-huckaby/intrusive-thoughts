@@ -1,5 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useApi } from "../hooks/useApi";
+import { Button } from "./ui/Button";
+import { Card, CardBody, CardHeader } from "./ui/Card";
+import { VerdictBadge, SeverityBadge } from "./ui/Badge";
 
 interface Review {
   id: number;
@@ -25,87 +28,149 @@ export function ReviewDetail() {
   const navigate = useNavigate();
   const { data: review, loading } = useApi<Review>(`/api/reviews/${id}`);
 
-  if (loading) return <p className="text-gray-500">Loading review...</p>;
-  if (!review) return <p className="text-red-500">Review not found.</p>;
+  if (loading) return <LoadingState />;
+  if (!review) return <NotFoundState />;
 
   const result: ReviewResult = JSON.parse(review.result_json);
 
   return (
     <div>
-      <button onClick={() => navigate("/reviews")} className="text-blue-600 hover:underline text-sm mb-4 block">&larr; Back to reviews</button>
-      <Header review={review} result={result} />
-      <Summary text={result.summary} />
-      <Comments comments={result.comments} />
-      <Suggestions items={result.suggestions} />
-    </div>
-  );
-}
-
-function Header({ review, result }: { review: Review; result: ReviewResult }) {
-  return (
-    <div className="mb-6">
-      <h2 className="text-2xl font-bold mb-2">{review.task_summary}</h2>
-      <div className="flex gap-4 text-sm text-gray-500">
-        <span>{new Date(review.created_at).toLocaleString()}</span>
-        <span>{review.provider}/{review.model}</span>
-        <span>Confidence: {Math.round(result.confidence * 100)}%</span>
-        <VerdictBadge verdict={result.verdict} />
+      <BackButton onClick={() => navigate("/reviews")} />
+      <ReviewHeader review={review} result={result} />
+      <div className="mt-6 space-y-6">
+        <SummarySection text={result.summary} />
+        <CommentsSection comments={result.comments} />
+        <SuggestionsSection items={result.suggestions} />
       </div>
     </div>
   );
 }
 
-function Summary({ text }: { text: string }) {
+function LoadingState() {
   return (
-    <div className="bg-white border rounded p-4 mb-6">
-      <h3 className="text-sm font-bold text-gray-700 mb-2">Summary</h3>
-      <p className="text-sm text-gray-600">{text}</p>
+    <div className="flex items-center gap-2 text-sm text-stone-400">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+      Loading review...
     </div>
   );
 }
 
-function Comments({ comments }: { comments: ReviewResult["comments"] }) {
+function NotFoundState() {
+  return (
+    <Card className="py-16 text-center">
+      <p className="text-sm font-medium text-stone-500">Review not found</p>
+    </Card>
+  );
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick} className="mb-4 -ml-2 gap-1.5">
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to reviews
+    </Button>
+  );
+}
+
+function ReviewHeader({ review, result }: { review: Review; result: ReviewResult }) {
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-stone-900">{review.task_summary}</h2>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <VerdictBadge verdict={result.verdict} />
+        <MetaItem label="Confidence" value={`${Math.round(result.confidence * 100)}%`} />
+        <MetaSeparator />
+        <MetaItem label="Provider" value={`${review.provider}/${review.model}`} />
+        <MetaSeparator />
+        <MetaItem label="Date" value={formatDate(review.created_at)} />
+      </div>
+    </div>
+  );
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="text-xs text-stone-500">
+      <span className="text-stone-400">{label}:</span> {value}
+    </span>
+  );
+}
+
+function MetaSeparator() {
+  return <span className="text-stone-200">|</span>;
+}
+
+function SummarySection({ text }: { text: string }) {
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="text-sm font-semibold text-stone-700">Summary</h3>
+      </CardHeader>
+      <CardBody>
+        <p className="text-sm leading-relaxed text-stone-600">{text}</p>
+      </CardBody>
+    </Card>
+  );
+}
+
+function CommentsSection({ comments }: { comments: ReviewResult["comments"] }) {
   if (comments.length === 0) return null;
   return (
-    <div className="mb-6">
-      <h3 className="text-sm font-bold text-gray-700 mb-3">Comments ({comments.length})</h3>
+    <div>
+      <h3 className="mb-3 text-sm font-semibold text-stone-700">
+        Comments <span className="font-normal text-stone-400">({comments.length})</span>
+      </h3>
       <div className="space-y-2">
         {comments.map((c, i) => (
-          <div key={i} className="bg-white border rounded p-3 text-sm">
-            <div className="flex gap-2 items-center mb-1">
-              <SeverityBadge severity={c.severity} />
-              <code className="text-xs text-gray-500">{c.file}{c.line ? `:${c.line}` : ""}</code>
-            </div>
-            <p className="text-gray-600">{c.comment}</p>
-          </div>
+          <CommentCard key={i} comment={c} />
         ))}
       </div>
     </div>
   );
 }
 
-function Suggestions({ items }: { items: string[] }) {
+function CommentCard({ comment }: { comment: ReviewResult["comments"][0] }) {
+  return (
+    <Card>
+      <CardBody className="space-y-2">
+        <div className="flex items-center gap-2">
+          <SeverityBadge severity={comment.severity} />
+          <code className="text-xs text-stone-400">
+            {comment.file}{comment.line ? `:${comment.line}` : ""}
+          </code>
+        </div>
+        <p className="text-sm leading-relaxed text-stone-600">{comment.comment}</p>
+      </CardBody>
+    </Card>
+  );
+}
+
+function SuggestionsSection({ items }: { items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <div>
-      <h3 className="text-sm font-bold text-gray-700 mb-3">Suggestions</h3>
-      <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 bg-white border rounded p-4">
-        {items.map((s, i) => <li key={i}>{s}</li>)}
-      </ul>
-    </div>
+    <Card>
+      <CardHeader>
+        <h3 className="text-sm font-semibold text-stone-700">Suggestions</h3>
+      </CardHeader>
+      <CardBody>
+        <ul className="space-y-2">
+          {items.map((s, i) => (
+            <li key={i} className="flex gap-2 text-sm text-stone-600">
+              <span className="mt-0.5 shrink-0 text-stone-300">-</span>
+              <span className="leading-relaxed">{s}</span>
+            </li>
+          ))}
+        </ul>
+      </CardBody>
+    </Card>
   );
 }
 
-function VerdictBadge({ verdict }: { verdict: string }) {
-  const isApproved = verdict === "approve";
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${isApproved ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-      {isApproved ? "Approved" : "Changes Requested"}
-    </span>
-  );
-}
-
-function SeverityBadge({ severity }: { severity: string }) {
-  const colors: Record<string, string> = { critical: "bg-red-100 text-red-800", warning: "bg-yellow-100 text-yellow-800", suggestion: "bg-blue-100 text-blue-800", nitpick: "bg-gray-100 text-gray-600" };
-  return <span className={`px-2 py-0.5 rounded text-xs ${colors[severity] ?? colors.nitpick}`}>{severity}</span>;
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString(undefined, {
+    month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
 }

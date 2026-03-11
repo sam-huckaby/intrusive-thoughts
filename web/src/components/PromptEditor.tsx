@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useApi, apiPut } from "../hooks/useApi";
+import { Button } from "./ui/Button";
+import { Card, CardBody, CardHeader } from "./ui/Card";
+import { TooltipProvider, Tooltip } from "./ui/Tooltip";
 
 const TEMPLATE_VARS = [
   { name: "{{task_summary}}", desc: "Task description from the calling agent" },
@@ -18,7 +21,7 @@ export function PromptEditor() {
 
   useEffect(() => { if (data) setContent(data.content); }, [data]);
 
-  if (loading) return <p className="text-gray-500">Loading prompt...</p>;
+  if (loading) return <LoadingState />;
 
   async function handleSave() {
     await apiPut("/api/prompt", { content });
@@ -34,17 +37,45 @@ export function PromptEditor() {
   );
 }
 
-function EditorPanel({ content, onChange, onSave, saved }: { content: string; onChange: (v: string) => void; onSave: () => void; saved: boolean }) {
+function LoadingState() {
+  return (
+    <div className="flex items-center gap-2 text-sm text-stone-400">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+      Loading prompt...
+    </div>
+  );
+}
+
+interface EditorPanelProps {
+  content: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  saved: boolean;
+}
+
+function EditorPanel({ content, onChange, onSave, saved }: EditorPanelProps) {
   return (
     <div className="flex-1">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Prompt Editor</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-stone-900">Prompt Editor</h2>
+          <p className="mt-1 text-sm text-stone-500">
+            Edit the system prompt template used for code reviews.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
-          <button onClick={onSave} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
-          {saved && <span className="text-green-600 text-sm">Saved!</span>}
+          <Button onClick={onSave}>Save Prompt</Button>
+          <SavedIndicator visible={saved} />
         </div>
       </div>
-      <textarea value={content} onChange={(e) => onChange(e.target.value)} className="w-full h-[600px] font-mono text-sm border rounded p-4 bg-white" />
+      <Card>
+        <textarea
+          value={content}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-[600px] w-full rounded-lg border-0 bg-white p-5 font-mono text-sm leading-relaxed text-stone-800 focus:ring-0"
+          spellCheck={false}
+        />
+      </Card>
     </div>
   );
 }
@@ -52,15 +83,46 @@ function EditorPanel({ content, onChange, onSave, saved }: { content: string; on
 function VariableReference() {
   return (
     <div className="w-72 shrink-0">
-      <h3 className="text-sm font-bold text-gray-700 mb-3">Template Variables</h3>
-      <div className="bg-white border rounded p-4 space-y-3">
-        {TEMPLATE_VARS.map((v) => (
-          <div key={v.name}>
-            <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold">{v.name}</code>
-            <p className="text-xs text-gray-500 mt-0.5">{v.desc}</p>
-          </div>
-        ))}
-      </div>
+      <Card>
+        <CardHeader>
+          <h3 className="text-sm font-semibold text-stone-700">Template Variables</h3>
+          <p className="mt-0.5 text-xs text-stone-400">
+            Use these placeholders in your prompt template.
+          </p>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          <TooltipProvider>
+            {TEMPLATE_VARS.map((v) => (
+              <VariableItem key={v.name} name={v.name} desc={v.desc} />
+            ))}
+          </TooltipProvider>
+        </CardBody>
+      </Card>
     </div>
+  );
+}
+
+function VariableItem({ name, desc }: { name: string; desc: string }) {
+  return (
+    <Tooltip content={desc} side="left">
+      <div className="cursor-default">
+        <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-stone-700">
+          {name}
+        </code>
+        <p className="mt-0.5 text-xs leading-relaxed text-stone-400">{desc}</p>
+      </div>
+    </Tooltip>
+  );
+}
+
+function SavedIndicator({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <span className="flex items-center gap-1.5 text-sm text-emerald-600">
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      Saved
+    </span>
   );
 }
