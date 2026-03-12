@@ -358,27 +358,151 @@ The web UI is a React + Tailwind CSS single-page app served by the HTTP server.
 | Review History | `/reviews` | Browse past reviews with verdict badges and timestamps |
 | Review Detail | `/reviews/:id` | Full result view with comments grouped by file, suggestions, and confidence score |
 
-### Development
+For setup, hot-reload workflow, and component conventions, see the [Development Guide](#development-guide) below.
 
-To run the web UI with hot-reload (proxies API requests to the backend):
+---
+
+## Development Guide
+
+This section covers everything a new contributor needs to get productive on the project.
+
+### Prerequisites
+
+- [Bun](https://bun.sh) v1.0+ (runtime, package manager, test runner, and bundler -- all in one)
+- Git
+- An API key for Anthropic or OpenAI (only needed to actually run reviews)
+
+### Initial Setup
 
 ```bash
-# Terminal 1: start the backend
+git clone https://github.com/your-org/intrusive-thoughts.git
+cd intrusive-thoughts
+bun install
+```
+
+### Architecture: Two-Process Dev Model
+
+The project has a **backend** (Bun + Express) and a **frontend** (React + Vite), and they run as two separate processes during development:
+
+| Process | Command | Port | What it does |
+|---|---|---|---|
+| Backend | `bun run dev` | 3456 | Express API server, serves built static files from `web/dist/` |
+| Frontend | `bun run dev:web` | 5173 | Vite dev server with hot-reload, proxies `/api` to :3456 |
+
+**Important gotcha:** If you edit web UI files and view `http://localhost:3456`, you will **not** see your changes -- that port serves the last production build. During frontend development, always use `http://localhost:5173`.
+
+### Running the Dev Environment
+
+```bash
+# Terminal 1: start the backend API server
 bun run dev
 
-# Terminal 2: start the Vite dev server
+# Terminal 2: start the Vite dev server with hot-reload
 bun run dev:web
 ```
 
-The Vite dev server runs at [http://localhost:5173](http://localhost:5173) and proxies `/api` requests to `http://localhost:3456`.
+Then open [http://localhost:5173](http://localhost:5173). The Vite dev server proxies all `/api` requests to the backend at `:3456`, so both the UI and API work seamlessly together.
 
-To build the web UI for production:
+### Coding Standards
+
+These rules are non-negotiable across the entire backend codebase (`src/`):
+
+| Rule | Details |
+|---|---|
+| **Function length** | 25 lines or fewer (body only, blank lines count) |
+| **Pure by default** | Functions should be pure. Impure functions must have a `@sideeffect` JSDoc annotation |
+| **No `any`** | Use `unknown` and narrow with type guards or Zod |
+| **No default exports** | Named exports only, everywhere |
+| **No mutable module-level state** | No top-level `let` or module singletons |
+| **Dependency injection** | DB handles, file paths, and provider instances are passed as parameters, never imported as singletons |
+| **Explicit return types** | All exported functions must declare their return type |
+
+TypeScript is configured with `strict: true`, `noUnusedLocals`, `noUnusedParameters`, and `noFallthroughCasesInSwitch` in both `tsconfig.json` (backend) and `web/tsconfig.json` (frontend).
+
+### Web UI Conventions
+
+The frontend lives in `web/src/` and uses React 19, Tailwind CSS v4, and Radix UI primitives.
+
+**Design system:**
+
+- Light paper-inspired theme: `stone-50` background, `slate-800` dark sidebar
+- Accent color is warm charcoal (`stone-800` / `stone-900`) for buttons and interactive elements
+- **No purples anywhere** -- the palette is stone, slate, and semantic colors (red, amber, emerald, sky, teal)
+
+**Shared UI components** live in `web/src/components/ui/`:
+
+| Component | File | Notes |
+|---|---|---|
+| Button | `ui/Button.tsx` | Variants: `primary`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md` |
+| Badge | `ui/Badge.tsx` | Semantic variants for verdicts, severities, and categories. Also exports `VerdictBadge`, `SeverityBadge`, `CategoryBadge` |
+| Card | `ui/Card.tsx` | `Card`, `CardHeader`, `CardBody` compound components |
+| Select | `ui/Select.tsx` | Wraps `@radix-ui/react-select` |
+| Switch | `ui/Switch.tsx` | Wraps `@radix-ui/react-switch` |
+| Dialog | `ui/Dialog.tsx` | Wraps `@radix-ui/react-dialog` |
+| Tooltip | `ui/Tooltip.tsx` | Wraps `@radix-ui/react-tooltip` |
+
+**Styling pattern:** All components use the `cn()` utility from `web/src/lib/utils.ts` (clsx + tailwind-merge) for class merging. Variant styles are defined as `Record<Variant, string>` constants, not computed dynamically -- this avoids the Tailwind purge issue where dynamic class names get stripped from the build.
+
+**API calls:** Use the `useApi` hook from `web/src/hooks/useApi.ts` for typed fetch calls to the backend.
+
+### Running Tests
+
+Tests use Bun's built-in test runner (`bun:test`). No external test framework is needed.
 
 ```bash
-bun run build:web
+# Run all 140 tests
+bun test
+
+# Run a specific test file
+bun test tests/core/context/chunker.test.ts
+
+# Watch mode
+bun test --watch
+
+# Coverage
+bun test --coverage
 ```
 
-The built files go to `web/dist/` and are served automatically by the HTTP server in `serve` mode.
+**Test database pattern:** Tests that need a database use `createTestDb()` from `tests/db/helpers.ts`, which creates a fresh in-memory SQLite instance (`:memory:`) with the schema and migrations applied. No cleanup needed -- the database disappears when the test ends.
+
+**Test fixtures** live in `tests/fixtures/` and include sample diffs, LLM response payloads, and prompt templates.
+
+The test suite includes 140 tests across 17 test files covering the database layer, git diff parsing, chunking logic, rules engine, prompt interpolation, LLM providers (mocked), the review orchestrator, the core review pipeline, and all REST API endpoints.
+
+### Type Checking
+
+The backend and frontend have separate TypeScript configs. Check both:
+
+```bash
+# Backend (src/)
+bunx tsc --noEmit
+
+# Frontend (web/src/)
+bunx tsc --noEmit -p web/tsconfig.json
+```
+
+Both must pass with zero errors before submitting changes.
+
+### Building for Production
+
+```bash
+# Build the web UI (outputs to web/dist/)
+bun run build:web
+
+# Build the backend (outputs to dist/)
+bun run build
+```
+
+After building, `bun run dev` (or `bun run src/index.ts serve`) will serve the built frontend from `web/dist/` alongside the API.
+
+### Database Notes
+
+- SQLite via `bun:sqlite` (built into Bun, no native addon)
+- Default location: `~/.intrusive-thoughts/data.db`
+- Override with `INTRUSIVE_THOUGHTS_DB_PATH` environment variable
+- Use `:memory:` for tests (see `openDatabase(":memory:")` or `createTestDb()`)
+- Schema and migrations run automatically on open -- no manual migration step
+- WAL mode is enabled for concurrent read performance
 
 ---
 
@@ -416,28 +540,6 @@ When a diff exceeds the `maxDiffLines` threshold (default: 5000 lines), intrusiv
 2. Each chunk contains at most `chunkSize` files (default: 10)
 3. Each chunk is reviewed independently with full task context and rules
 4. A final synthesis LLM call combines all chunk results into a single unified verdict
-
----
-
-## Testing
-
-Tests use Bun's built-in test runner (`bun:test`) with no external test framework.
-
-```bash
-# Run all tests
-bun test
-
-# Run a specific test file
-bun test tests/core/context/chunker.test.ts
-
-# Run tests in watch mode
-bun test --watch
-
-# Run with coverage
-bun test --coverage
-```
-
-The test suite includes 140 tests across 17 test files covering the database layer, git diff parsing, chunking logic, rules engine, prompt interpolation, LLM providers (mocked), the review orchestrator, the core review pipeline, and all REST API endpoints.
 
 ---
 
