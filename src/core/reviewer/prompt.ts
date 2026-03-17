@@ -1,5 +1,5 @@
 import { readFile } from "fs/promises";
-import type { ReviewContext, DiffChunk, ChangedFile } from "../../types";
+import type { ReviewContext, ReviewResult, DiffChunk, ChangedFile } from "../../types";
 import { formatRulesForPrompt } from "../rules/engine";
 
 export interface PromptVariables {
@@ -10,6 +10,7 @@ export interface PromptVariables {
   stats: string;
   is_chunk: string;
   chunk_info: string;
+  previous_reviews: string;
 }
 
 /**
@@ -41,7 +42,10 @@ export function interpolatePrompt(
 /**
  * Builds PromptVariables from a ReviewContext for a full (non-chunked) review.
  */
-export function buildPromptVariables(context: ReviewContext): PromptVariables {
+export function buildPromptVariables(
+  context: ReviewContext,
+  previousReviews?: ReviewResult[],
+): PromptVariables {
   return {
     task_summary: context.taskSummary,
     rules: formatRulesForPrompt(context.rules),
@@ -50,6 +54,7 @@ export function buildPromptVariables(context: ReviewContext): PromptVariables {
     stats: formatStats(context.stats),
     is_chunk: "false",
     chunk_info: "",
+    previous_reviews: formatPreviousReviews(previousReviews),
   };
 }
 
@@ -61,6 +66,7 @@ export function buildChunkPromptVariables(
   chunk: DiffChunk,
   chunkIndex: number,
   totalChunks: number,
+  previousReviews?: ReviewResult[],
 ): PromptVariables {
   return {
     task_summary: context.taskSummary,
@@ -70,7 +76,48 @@ export function buildChunkPromptVariables(
     stats: formatStats(chunk.stats),
     is_chunk: "true",
     chunk_info: `Reviewing chunk ${chunkIndex + 1} of ${totalChunks}`,
+    previous_reviews: formatPreviousReviews(previousReviews),
   };
+}
+
+/**
+ * Formats previous review results into a concise summary for the LLM prompt.
+ * Includes verdict, summary, and comments from each prior round so the
+ * reviewer can avoid contradictions and repetition.
+ */
+export function formatPreviousReviews(reviews?: ReviewResult[]): string {
+  if (!reviews || reviews.length === 0) {
+    return "This is the first review of this session. No previous reviews exist.";
+  }
+
+  return reviews
+    .map((review, index) => {
+      const lines = [
+        `### Round ${index + 1} — ${review.verdict === "approve" ? "Approved" : "Changes Requested"}`,
+        "",
+        `**Summary:** ${review.summary}`,
+      ];
+
+      if (review.comments.length > 0) {
+        lines.push("", "**Comments:**");
+        for (const comment of review.comments) {
+          const location = comment.line
+            ? `${comment.file}:${comment.line}`
+            : comment.file;
+          lines.push(`- [${comment.severity}] ${location} — ${comment.comment}`);
+        }
+      }
+
+      if (review.suggestions.length > 0) {
+        lines.push("", "**Suggestions:**");
+        for (const suggestion of review.suggestions) {
+          lines.push(`- ${suggestion}`);
+        }
+      }
+
+      return lines.join("\n");
+    })
+    .join("\n\n");
 }
 
 function formatFileList(files: ChangedFile[]): string {

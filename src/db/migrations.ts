@@ -19,6 +19,13 @@ const MIGRATIONS: Migration[] = [
       `INSERT OR IGNORE INTO config (key, value) VALUES ('httpPort', '3456')`,
     ],
   },
+  {
+    version: 2,
+    description: "Add maxReviewRounds config default",
+    up: [
+      `INSERT OR IGNORE INTO config (key, value) VALUES ('maxReviewRounds', '5')`,
+    ],
+  },
 ];
 
 function getAppliedVersions(db: Database): Set<number> {

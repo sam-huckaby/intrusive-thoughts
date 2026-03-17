@@ -11,6 +11,7 @@ export interface RunReviewInput {
   taskSummary: string;
   baseBranch?: string;
   workingDirectory?: string;
+  previousReviews?: ReviewResult[];
 }
 
 export interface RunReviewDeps {
@@ -52,6 +53,7 @@ export async function runReview(
     promptPath: deps.promptPath,
     maxDiffLines: config.maxDiffLines,
     chunkSize: config.chunkSize,
+    previousReviews: input.previousReviews,
   });
   saveReview(deps.db, input, baseBranch, result, gitResult.files, config);
   return result;
@@ -67,6 +69,7 @@ function loadConfig(db: Database): AppConfig {
     maxDiffLines: Number(map.get("maxDiffLines") ?? "5000"),
     chunkSize: Number(map.get("chunkSize") ?? "10"),
     httpPort: Number(map.get("httpPort") ?? "3456"),
+    maxReviewRounds: Number(map.get("maxReviewRounds") ?? "5"),
   };
 }
 

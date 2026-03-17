@@ -3,10 +3,18 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { Database } from "bun:sqlite";
 import { runReview } from "../core/review";
+import type { ReviewResult } from "../types";
+import { ReviewSession } from "./session";
+import type { SessionMetadata } from "./session";
 
 export interface McpServerOptions {
   db: Database;
   promptPath: string;
+}
+
+export interface McpReviewResponse {
+  review: ReviewResult;
+  session: SessionMetadata;
 }
 
 /**
@@ -26,11 +34,28 @@ function createMcpServerInstance(options: McpServerOptions): McpServer {
     name: "intrusive-thoughts",
     version: "0.1.0",
   });
-  registerReviewTool(server, options);
+  const session = createSession(options.db);
+  registerReviewTool(server, options, session);
   return server;
 }
 
-function registerReviewTool(server: McpServer, options: McpServerOptions): void {
+/**
+ * Reads maxReviewRounds from the config table and creates a ReviewSession.
+ * The session lives for the lifetime of the MCP server process.
+ */
+function createSession(db: Database): ReviewSession {
+  const row = db.query("SELECT value FROM config WHERE key = ?").get("maxReviewRounds") as
+    | { value: string }
+    | null;
+  const maxRounds = Number(row?.value ?? "5");
+  return new ReviewSession(maxRounds);
+}
+
+function registerReviewTool(
+  server: McpServer,
+  options: McpServerOptions,
+  session: ReviewSession,
+): void {
   server.tool(
     "review_code",
     {
@@ -45,19 +70,53 @@ function registerReviewTool(server: McpServer, options: McpServerOptions): void 
       ),
     },
     async ({ taskSummary, baseBranch, workingDirectory }) =>
-      handleReviewTool(options, taskSummary, baseBranch, workingDirectory),
+      handleReviewTool(options, session, taskSummary, baseBranch, workingDirectory),
   );
 }
 
 async function handleReviewTool(
   options: McpServerOptions,
+  session: ReviewSession,
   taskSummary: string,
   baseBranch?: string,
   workingDirectory?: string,
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+  // Check if the session has rounds remaining BEFORE running the review
+  if (!session.hasRoundsRemaining()) {
+    const metadata = session.buildSessionMetadata();
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              review: null,
+              session: metadata,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  }
+
   const result = await runReview(
-    { taskSummary, baseBranch, workingDirectory },
+    {
+      taskSummary,
+      baseBranch,
+      workingDirectory,
+      previousReviews: session.getPreviousReviews(),
+    },
     { db: options.db, promptPath: options.promptPath },
   );
-  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+
+  session.recordRound(result);
+
+  const response: McpReviewResponse = {
+    review: result,
+    session: session.buildSessionMetadata(),
+  };
+
+  return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
 }

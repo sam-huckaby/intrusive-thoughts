@@ -76,6 +76,19 @@ export function ConfigPage() {
               onChange={(e) => setForm({ ...form, httpPort: e.target.value })}
             />
           </FormField>
+          <FormField label="Max Review Rounds (MCP)">
+            <input
+              type="number"
+              min="1"
+              max="20"
+              value={form.maxReviewRounds ?? ""}
+              onChange={(e) => setForm({ ...form, maxReviewRounds: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-stone-400">
+              Maximum number of times an agent can request a review in a single MCP session.
+              Prevents runaway review loops. Default: 5.
+            </p>
+          </FormField>
           <EnvNote />
           <div className="flex items-center gap-3 pt-1">
             <Button onClick={handleSave}>Save Configuration</Button>

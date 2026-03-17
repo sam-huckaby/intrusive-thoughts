@@ -121,4 +121,5 @@ export interface AppConfig {
   maxDiffLines: number;
   chunkSize: number;
   httpPort: number;
+  maxReviewRounds: number;
 }

@@ -5,9 +5,10 @@ import {
   interpolatePrompt,
   buildPromptVariables,
   buildChunkPromptVariables,
+  formatPreviousReviews,
 } from "../../../src/core/reviewer/prompt";
 import type { PromptVariables } from "../../../src/core/reviewer/prompt";
-import type { ReviewContext, DiffChunk } from "../../../src/types";
+import type { ReviewContext, ReviewResult, DiffChunk } from "../../../src/types";
 
 const TEST_PROMPT = join(import.meta.dir, "../../fixtures/prompts/test-review.md");
 
@@ -55,6 +56,7 @@ describe("interpolatePrompt", () => {
       stats: "1 file",
       is_chunk: "false",
       chunk_info: "",
+      previous_reviews: "",
     };
     const result = interpolatePrompt(template, vars);
     expect(result).toBe("Task: Test task Rules: Rule 1 Diff: +line");
@@ -70,6 +72,7 @@ describe("interpolatePrompt", () => {
       stats: "",
       is_chunk: "false",
       chunk_info: "",
+      previous_reviews: "",
     };
     const result = interpolatePrompt(template, vars);
     expect(result).toContain("Test");
@@ -86,6 +89,7 @@ describe("interpolatePrompt", () => {
       stats: "",
       is_chunk: "false",
       chunk_info: "",
+      previous_reviews: "",
     };
     const result = interpolatePrompt(template, vars);
     expect(result).toBe("CONTENT and also CONTENT");
@@ -124,6 +128,28 @@ describe("buildPromptVariables", () => {
     const vars = buildPromptVariables(makeContext({ rules: [] }));
     expect(vars.rules).toBe("No review rules configured.");
   });
+
+  it("includes first-review message when no previous reviews", () => {
+    const vars = buildPromptVariables(makeContext());
+    expect(vars.previous_reviews).toContain("first review");
+  });
+
+  it("includes previous review context when provided", () => {
+    const previous: ReviewResult[] = [
+      {
+        verdict: "request_changes",
+        summary: "Fix the auth bug",
+        comments: [{ file: "src/auth.ts", line: 10, severity: "critical", comment: "Missing null check" }],
+        suggestions: ["Add tests"],
+        confidence: 0.9,
+      },
+    ];
+    const vars = buildPromptVariables(makeContext(), previous);
+    expect(vars.previous_reviews).toContain("Round 1");
+    expect(vars.previous_reviews).toContain("Changes Requested");
+    expect(vars.previous_reviews).toContain("Fix the auth bug");
+    expect(vars.previous_reviews).toContain("Missing null check");
+  });
 });
 
 describe("buildChunkPromptVariables", () => {
@@ -149,5 +175,110 @@ describe("buildChunkPromptVariables", () => {
     chunk.files = [{ path: "chunk-file.ts", status: "modified", additions: 5, deletions: 2 }];
     const vars = buildChunkPromptVariables(makeContext(), chunk, 0, 1);
     expect(vars.changed_files).toContain("chunk-file.ts");
+  });
+
+  it("includes previous reviews when provided", () => {
+    const previous: ReviewResult[] = [
+      {
+        verdict: "request_changes",
+        summary: "Chunk review feedback",
+        comments: [],
+        suggestions: [],
+        confidence: 0.7,
+      },
+    ];
+    const vars = buildChunkPromptVariables(makeContext(), makeChunk(), 0, 1, previous);
+    expect(vars.previous_reviews).toContain("Chunk review feedback");
+  });
+});
+
+describe("formatPreviousReviews", () => {
+  it("returns first-review message when undefined", () => {
+    const result = formatPreviousReviews(undefined);
+    expect(result).toContain("first review");
+    expect(result).toContain("No previous reviews");
+  });
+
+  it("returns first-review message when empty array", () => {
+    const result = formatPreviousReviews([]);
+    expect(result).toContain("first review");
+  });
+
+  it("formats a single previous review", () => {
+    const reviews: ReviewResult[] = [
+      {
+        verdict: "request_changes",
+        summary: "Needs work",
+        comments: [
+          { file: "src/foo.ts", line: 5, severity: "critical", comment: "Bug here" },
+        ],
+        suggestions: ["Write tests"],
+        confidence: 0.8,
+      },
+    ];
+    const result = formatPreviousReviews(reviews);
+    expect(result).toContain("Round 1");
+    expect(result).toContain("Changes Requested");
+    expect(result).toContain("Needs work");
+    expect(result).toContain("src/foo.ts:5");
+    expect(result).toContain("Bug here");
+    expect(result).toContain("Write tests");
+  });
+
+  it("formats multiple previous reviews with round numbers", () => {
+    const reviews: ReviewResult[] = [
+      {
+        verdict: "request_changes",
+        summary: "First round feedback",
+        comments: [],
+        suggestions: [],
+        confidence: 0.7,
+      },
+      {
+        verdict: "request_changes",
+        summary: "Second round feedback",
+        comments: [],
+        suggestions: [],
+        confidence: 0.8,
+      },
+    ];
+    const result = formatPreviousReviews(reviews);
+    expect(result).toContain("Round 1");
+    expect(result).toContain("Round 2");
+    expect(result).toContain("First round feedback");
+    expect(result).toContain("Second round feedback");
+  });
+
+  it("shows 'Approved' for approve verdicts", () => {
+    const reviews: ReviewResult[] = [
+      {
+        verdict: "approve",
+        summary: "Looks good",
+        comments: [],
+        suggestions: [],
+        confidence: 0.95,
+      },
+    ];
+    const result = formatPreviousReviews(reviews);
+    expect(result).toContain("Approved");
+    expect(result).not.toContain("Changes Requested");
+  });
+
+  it("formats comments without line numbers using file path only", () => {
+    const reviews: ReviewResult[] = [
+      {
+        verdict: "request_changes",
+        summary: "Issues found",
+        comments: [
+          { file: "src/bar.ts", severity: "warning", comment: "General concern" },
+        ],
+        suggestions: [],
+        confidence: 0.8,
+      },
+    ];
+    const result = formatPreviousReviews(reviews);
+    expect(result).toContain("src/bar.ts");
+    expect(result).toContain("General concern");
+    expect(result).not.toContain("src/bar.ts:");
   });
 });

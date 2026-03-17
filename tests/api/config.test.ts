@@ -25,6 +25,7 @@ describe("GET /api/config", () => {
     expect(res.body.maxDiffLines).toBe("5000");
     expect(res.body.chunkSize).toBe("10");
     expect(res.body.httpPort).toBe("3456");
+    expect(res.body.maxReviewRounds).toBe("5");
   });
 });
 
@@ -50,5 +51,18 @@ describe("PUT /api/config", () => {
       .put("/api/config")
       .send({ baseBranch: "develop" });
     expect(res.body.baseBranch).toBe("develop");
+  });
+
+  it("updates maxReviewRounds", async () => {
+    const res = await request
+      .put("/api/config")
+      .send({ maxReviewRounds: "10" });
+    expect(res.body.maxReviewRounds).toBe("10");
+  });
+
+  it("preserves maxReviewRounds on partial update", async () => {
+    await request.put("/api/config").send({ model: "gpt-4o" });
+    const res = await request.get("/api/config");
+    expect(res.body.maxReviewRounds).toBe("5");
   });
 });

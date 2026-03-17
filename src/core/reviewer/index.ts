@@ -20,6 +20,7 @@ export interface ReviewerOptions {
   promptPath: string;
   maxDiffLines: number;
   chunkSize: number;
+  previousReviews?: ReviewResult[];
 }
 
 /**
@@ -38,9 +39,9 @@ export async function reviewCode(
   const template = await loadPromptTemplate(options.promptPath);
   const chunks = buildChunks(context, options);
   if (chunks.length <= 1) {
-    return performSingleReview(context, template, options.provider);
+    return performSingleReview(context, template, options.provider, options.previousReviews);
   }
-  return performChunkedReview(context, chunks, template, options.provider);
+  return performChunkedReview(context, chunks, template, options.provider, options.previousReviews);
 }
 
 function buildChunks(context: ReviewContext, options: ReviewerOptions): DiffChunk[] {
@@ -55,8 +56,9 @@ async function performSingleReview(
   context: ReviewContext,
   template: string,
   provider: LLMProvider,
+  previousReviews?: ReviewResult[],
 ): Promise<ReviewResult> {
-  const variables = buildPromptVariables(context);
+  const variables = buildPromptVariables(context, previousReviews);
   const prompt = interpolatePrompt(template, variables);
   const raw = await provider.call(prompt, "Please review the code changes above.");
   return parseReviewResult(raw);
@@ -67,10 +69,11 @@ async function performChunkedReview(
   chunks: DiffChunk[],
   template: string,
   provider: LLMProvider,
+  previousReviews?: ReviewResult[],
 ): Promise<ReviewResult> {
   const chunkResults: ChunkReviewResult[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    const result = await reviewChunk(context, chunks[i], i, chunks.length, provider, template);
+    const result = await reviewChunk(context, chunks[i], i, chunks.length, provider, template, previousReviews);
     chunkResults.push(result);
   }
   return synthesizeChunkResults(chunkResults, context, provider);
@@ -90,8 +93,9 @@ export async function reviewChunk(
   totalChunks: number,
   provider: LLMProvider,
   promptTemplate: string,
+  previousReviews?: ReviewResult[],
 ): Promise<ChunkReviewResult> {
-  const variables = buildChunkPromptVariables(context, chunk, chunkIndex, totalChunks);
+  const variables = buildChunkPromptVariables(context, chunk, chunkIndex, totalChunks, previousReviews);
   const prompt = interpolatePrompt(promptTemplate, variables);
   const raw = await provider.call(prompt, "Please review this chunk of code changes.");
   return parseChunkResult(raw);
