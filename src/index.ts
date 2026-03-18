@@ -1,10 +1,11 @@
 import { join } from "path";
 import { parseArgs } from "./cli";
 import { openDatabase, getDefaultDbPath } from "./db/index";
-import { runReview } from "./core/review";
+import { runMultiReview } from "./core/review-multi";
 import { startHttpServer } from "./server/http";
 import { startMcpServer } from "./server/mcp";
 import { seedDefaultRules } from "./db/seed";
+import { seedProfiles } from "./db/seed-profiles";
 
 /**
  * Main entrypoint. Detects mode from CLI args and starts
@@ -15,6 +16,7 @@ export async function main(): Promise<void> {
   const args = parseArgs(process.argv);
   const db = openDatabase(getDefaultDbPath());
   seedDefaultRules(db);
+  await seedProfiles(db, resolveReviewersDir());
   const promptPath = resolvePromptPath();
   switch (args.mode) {
     case "review": return handleReviewMode(args, db, promptPath);
@@ -27,18 +29,27 @@ function resolvePromptPath(): string {
   return join(import.meta.dir, "..", "prompts", "code-review.md");
 }
 
+function resolveReviewersDir(): string {
+  return join(import.meta.dir, "..", "prompts", "reviewers");
+}
+
 async function handleReviewMode(
   args: ReturnType<typeof parseArgs>,
   db: ReturnType<typeof openDatabase>,
-  promptPath: string,
+  _promptPath: string,
 ): Promise<void> {
   if (!args.summary) {
     console.error("Error: --summary is required for review mode");
     process.exit(1);
   }
-  const result = await runReview(
-    { taskSummary: args.summary, baseBranch: args.baseBranch, workingDirectory: args.dir },
-    { db, promptPath },
+  const result = await runMultiReview(
+    {
+      taskSummary: args.summary,
+      baseBranch: args.baseBranch,
+      workingDirectory: args.dir,
+      reviewers: args.reviewers,
+    },
+    { db },
   );
   console.log(JSON.stringify(result, null, 2));
 }

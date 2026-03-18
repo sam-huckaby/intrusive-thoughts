@@ -1,19 +1,20 @@
 import { Router } from "express";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
-import { runReview } from "../core/review";
+import { runMultiReview } from "../core/review-multi";
 
 const RunReviewSchema = z.object({
   taskSummary: z.string().min(1),
   baseBranch: z.string().optional(),
   workingDirectory: z.string().optional(),
+  reviewers: z.array(z.string()).optional(),
 });
 
-export function createReviewsRouter(db: Database, promptPath: string): Router {
+export function createReviewsRouter(db: Database, _promptPath: string): Router {
   const router = Router();
   router.get("/", (_req, res) => handleListReviews(db, res));
   router.get("/:id", (req, res) => handleGetReview(db, req.params.id, res));
-  router.post("/run", (req, res) => handleRunReview(db, promptPath, req.body, res));
+  router.post("/run", (req, res) => handleRunReview(db, req.body, res));
   return router;
 }
 
@@ -38,7 +39,6 @@ function handleGetReview(
 
 async function handleRunReview(
   db: Database,
-  promptPath: string,
   body: unknown,
   res: { status: (code: number) => { json: (body: unknown) => void }; json: (body: unknown) => void },
 ): Promise<void> {
@@ -48,7 +48,15 @@ async function handleRunReview(
     return;
   }
   try {
-    const result = await runReview(parsed.data, { db, promptPath });
+    const result = await runMultiReview(
+      {
+        taskSummary: parsed.data.taskSummary,
+        baseBranch: parsed.data.baseBranch,
+        workingDirectory: parsed.data.workingDirectory,
+        reviewers: parsed.data.reviewers,
+      },
+      { db },
+    );
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

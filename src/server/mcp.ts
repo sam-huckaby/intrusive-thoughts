@@ -2,9 +2,27 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { Database } from "bun:sqlite";
-import { runReview } from "../core/review";
-import type { ReviewResult } from "../types";
-import { ReviewSession } from "./session";
+import type {
+  ReviewerProfile,
+  ProfileReviewResult,
+  AcceptedProfile,
+} from "../types";
+import { ConfigError } from "../types";
+import { getGitDiff } from "../core/context/git";
+import { buildReviewContext } from "../core/context/builder";
+import { createProvider } from "../core/reviewer/providers/types";
+import { reviewCode } from "../core/reviewer/index";
+import {
+  getEnabledProfiles,
+  getProfileBySlug,
+  getFallbackProfile,
+  getProfileRules,
+} from "../core/profiles/index";
+import { matchProfiles, getMatchingFiles } from "../core/profiles/matcher";
+import {
+  ReviewSession,
+  hashDiff,
+} from "./session";
 import type { SessionMetadata } from "./session";
 
 export interface McpServerOptions {
@@ -13,7 +31,11 @@ export interface McpServerOptions {
 }
 
 export interface McpReviewResponse {
-  review: ReviewResult;
+  reviews: ProfileReviewResult[] | null;
+  accepted: AcceptedProfile[];
+  allAccepted: boolean;
+  fallbackUsed: boolean;
+  fallbackWarning: string | null;
   session: SessionMetadata;
 }
 
@@ -68,9 +90,13 @@ function registerReviewTool(
       workingDirectory: z.string().optional().describe(
         "Path to the git repository. Defaults to the current working directory",
       ),
+      reviewers: z.array(z.string()).optional().describe(
+        "Specific reviewer profile slugs to use. If omitted, profiles are selected " +
+          "automatically by file-pattern matching.",
+      ),
     },
-    async ({ taskSummary, baseBranch, workingDirectory }) =>
-      handleReviewTool(options, session, taskSummary, baseBranch, workingDirectory),
+    async ({ taskSummary, baseBranch, workingDirectory, reviewers }) =>
+      handleReviewTool(options, session, taskSummary, baseBranch, workingDirectory, reviewers),
   );
 }
 
@@ -80,43 +106,292 @@ async function handleReviewTool(
   taskSummary: string,
   baseBranch?: string,
   workingDirectory?: string,
+  reviewers?: string[],
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-  // Check if the session has rounds remaining BEFORE running the review
+  // Check rounds
   if (!session.hasRoundsRemaining()) {
-    const metadata = session.buildSessionMetadata();
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            {
-              review: null,
-              session: metadata,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
+    return jsonResponse({
+      reviews: null,
+      accepted: buildAcceptedList(session),
+      allAccepted: session.isAllAccepted(),
+      fallbackUsed: false,
+      fallbackWarning: null,
+      session: session.buildSessionMetadata(),
+    });
   }
 
-  const result = await runReview(
-    {
-      taskSummary,
-      baseBranch,
-      workingDirectory,
-      previousReviews: session.getPreviousReviews(),
-    },
-    { db: options.db, promptPath: options.promptPath },
+  // Check if all accepted
+  if (session.isAllAccepted() && session.getRoundNumber() > 0) {
+    return jsonResponse({
+      reviews: [],
+      accepted: buildAcceptedList(session),
+      allAccepted: true,
+      fallbackUsed: false,
+      fallbackWarning: null,
+      session: {
+        ...session.buildSessionMetadata(),
+        instructions: "All reviewers have approved your changes. No further review rounds are needed.",
+      },
+    });
+  }
+
+  const config = loadConfig(options.db);
+  const resolvedBaseBranch = baseBranch ?? config.baseBranch;
+  const workDir = workingDirectory ?? process.cwd();
+
+  // Get git diff
+  const gitResult = await getGitDiff(workDir, resolvedBaseBranch);
+  const changedFilePaths = gitResult.files.map((f) => f.path);
+
+  // Resolve profiles
+  const {
+    profiles: matchedProfiles,
+    fallbackUsed,
+    fallbackWarning,
+  } = resolveProfiles(options.db, changedFilePaths, reviewers);
+
+  // Compute per-profile diff hashes for re-trigger detection
+  const diffHashes = new Map<string, string>();
+  for (const profile of matchedProfiles) {
+    const matchingFiles = getMatchingFiles(profile.filePatterns, changedFilePaths);
+    // Hash the matching file paths + full diff as a proxy for "relevant diff"
+    // (A more precise implementation would extract only the diff sections for matching files)
+    const hashInput = matchingFiles.sort().join("\n") + "\n---\n" + gitResult.diff;
+    diffHashes.set(profile.slug, hashDiff(hashInput));
+  }
+
+  // Filter through session state (skip accepted, detect re-triggers)
+  const { active: activeSlugs, reTriggered } = session.getActiveProfiles(
+    matchedProfiles.map((p) => p.slug),
+    diffHashes,
   );
 
-  session.recordRound(result);
+  const activeProfiles = matchedProfiles.filter((p) => activeSlugs.includes(p.slug));
+
+  // If no profiles to run after filtering
+  if (activeProfiles.length === 0 && session.isAllAccepted()) {
+    return jsonResponse({
+      reviews: [],
+      accepted: buildAcceptedList(session),
+      allAccepted: true,
+      fallbackUsed,
+      fallbackWarning,
+      session: {
+        ...session.buildSessionMetadata(),
+        instructions: "All reviewers have approved your changes. No further review rounds are needed.",
+      },
+    });
+  }
+
+  // Create LLM provider
+  const provider = createProvider({
+    provider: config.provider,
+    model: config.model,
+    apiKey: resolveApiKey(config.provider),
+  });
+
+  // Run each active profile
+  const profileResults: ProfileReviewResult[] = [];
+  const roundResults: Array<{
+    slug: string;
+    review: import("../types").ReviewResult;
+    matchingFiles: string[];
+    diffHash: string;
+  }> = [];
+
+  for (const profile of activeProfiles) {
+    const rules = getProfileRules(options.db, profile.id);
+    const context = buildReviewContext({
+      taskSummary,
+      baseBranch: resolvedBaseBranch,
+      workingDirectory: workDir,
+      gitResult,
+      rules,
+    });
+
+    // Get previous reviews for this specific profile
+    const previousReviews = session.getPreviousReviewsForProfile(profile.slug);
+
+    // If re-triggered, prepend follow-up context
+    let effectivePreviousReviews = previousReviews;
+    const profileState = session.getProfileState(profile.slug);
+    const isFollowUp = reTriggered.has(profile.slug);
+    const previouslyAcceptedAtRound = isFollowUp
+      ? (profileState?.acceptedAtRound ?? null)
+      : null;
+
+    const review = await reviewCode(context, {
+      provider,
+      promptPath: options.promptPath,
+      promptContent: profile.prompt,
+      maxDiffLines: config.maxDiffLines,
+      chunkSize: config.chunkSize,
+      previousReviews: effectivePreviousReviews,
+    });
+
+    const matchingFiles = getMatchingFiles(profile.filePatterns, changedFilePaths);
+    const diffHash = diffHashes.get(profile.slug) ?? "";
+
+    profileResults.push({
+      profile: profile.slug,
+      profileName: profile.name,
+      review,
+      isFollowUp,
+      previouslyAcceptedAtRound,
+    });
+
+    roundResults.push({
+      slug: profile.slug,
+      review,
+      matchingFiles,
+      diffHash,
+    });
+
+    // Save to DB
+    saveReview(options.db, taskSummary, resolvedBaseBranch, review, profile, gitResult.files, config);
+  }
+
+  // Record round in session
+  session.recordRound(roundResults);
 
   const response: McpReviewResponse = {
-    review: result,
+    reviews: profileResults,
+    accepted: buildAcceptedList(session),
+    allAccepted: session.isAllAccepted(),
+    fallbackUsed,
+    fallbackWarning,
     session: session.buildSessionMetadata(),
   };
 
-  return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+  return jsonResponse(response);
+}
+
+// ─── Profile resolution ──────────────────────────────────
+
+interface ResolvedProfiles {
+  profiles: ReviewerProfile[];
+  fallbackUsed: boolean;
+  fallbackWarning: string | null;
+}
+
+function resolveProfiles(
+  db: Database,
+  changedFilePaths: string[],
+  explicitReviewers?: string[],
+): ResolvedProfiles {
+  if (explicitReviewers && explicitReviewers.length > 0) {
+    const profiles = explicitReviewers
+      .map((slug) => getProfileBySlug(db, slug))
+      .filter((p): p is ReviewerProfile => p !== null && p.enabled);
+
+    return { profiles, fallbackUsed: false, fallbackWarning: null };
+  }
+
+  const enabled = getEnabledProfiles(db);
+  const matched = matchProfiles(enabled, changedFilePaths);
+
+  if (matched.length > 0) {
+    return { profiles: matched, fallbackUsed: false, fallbackWarning: null };
+  }
+
+  const fallback = getFallbackProfile(db);
+  if (fallback && fallback.enabled) {
+    return {
+      profiles: [fallback],
+      fallbackUsed: true,
+      fallbackWarning: `No reviewer profiles matched the changed files. Using the fallback '${fallback.slug}' profile.`,
+    };
+  }
+
+  return {
+    profiles: [],
+    fallbackUsed: true,
+    fallbackWarning:
+      "No reviewer profiles matched the changed files, and the configured fallback profile was not found.",
+  };
+}
+
+// ─── Helpers ─────────────────────────────────────────────
+
+function buildAcceptedList(session: ReviewSession): AcceptedProfile[] {
+  // We don't have profileName readily available from session state, so we store slug only.
+  // The full AcceptedProfile with name would require a DB lookup.
+  // For now, use slug as both profile and profileName.
+  return session.getAcceptedProfiles().map((a) => ({
+    profile: a.slug,
+    profileName: a.slug,
+    acceptedAtRound: a.acceptedAtRound,
+  }));
+}
+
+interface AppConfig {
+  provider: "anthropic" | "openai";
+  model: string;
+  baseBranch: string;
+  maxDiffLines: number;
+  chunkSize: number;
+  httpPort: number;
+  maxReviewRounds: number;
+  fallbackProfile: string;
+}
+
+function loadConfig(db: Database): AppConfig {
+  const rows = db.query("SELECT key, value FROM config").all() as Array<{
+    key: string;
+    value: string;
+  }>;
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  return {
+    provider: (map.get("provider") ?? "anthropic") as AppConfig["provider"],
+    model: map.get("model") ?? "claude-sonnet-4-20250514",
+    baseBranch: map.get("baseBranch") ?? "main",
+    maxDiffLines: Number(map.get("maxDiffLines") ?? "5000"),
+    chunkSize: Number(map.get("chunkSize") ?? "10"),
+    httpPort: Number(map.get("httpPort") ?? "3456"),
+    maxReviewRounds: Number(map.get("maxReviewRounds") ?? "5"),
+    fallbackProfile: map.get("fallbackProfile") ?? "general",
+  };
+}
+
+function resolveApiKey(provider: string): string {
+  const envKey = provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+  const value = process.env[envKey];
+  if (!value) throw new ConfigError(`Missing env var: ${envKey}`, envKey);
+  return value;
+}
+
+function saveReview(
+  db: Database,
+  taskSummary: string,
+  baseBranch: string,
+  result: import("../types").ReviewResult,
+  profile: ReviewerProfile,
+  files: Array<{ path: string }>,
+  config: AppConfig,
+): void {
+  db.run(
+    `INSERT INTO reviews (task_summary, base_branch, verdict, result_json, files_reviewed, provider, model)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      taskSummary,
+      baseBranch,
+      result.verdict,
+      JSON.stringify({
+        profile: profile.slug,
+        profileName: profile.name,
+        ...result,
+      }),
+      JSON.stringify(files.map((f) => f.path)),
+      config.provider,
+      config.model,
+    ],
+  );
+}
+
+function jsonResponse(
+  data: McpReviewResponse,
+): { content: Array<{ type: "text"; text: string }> } {
+  return {
+    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+  };
 }

@@ -70,6 +70,7 @@ function loadConfig(db: Database): AppConfig {
     chunkSize: Number(map.get("chunkSize") ?? "10"),
     httpPort: Number(map.get("httpPort") ?? "3456"),
     maxReviewRounds: Number(map.get("maxReviewRounds") ?? "5"),
+    fallbackProfile: map.get("fallbackProfile") ?? "general",
   };
 }
 

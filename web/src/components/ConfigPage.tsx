@@ -4,6 +4,13 @@ import { Button } from "./ui/Button";
 import { Select } from "./ui/Select";
 import { Card, CardBody } from "./ui/Card";
 
+interface Profile {
+  id: number;
+  slug: string;
+  name: string;
+  enabled: number;
+}
+
 const PROVIDERS = [
   { value: "anthropic", label: "Anthropic" },
   { value: "openai", label: "OpenAI" },
@@ -11,10 +18,15 @@ const PROVIDERS = [
 
 export function ConfigPage() {
   const { data, loading, refetch } = useApi<Record<string, string>>("/api/config");
+  const { data: profiles } = useApi<Profile[]>("/api/profiles");
   const [form, setForm] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => { if (data) setForm(data); }, [data]);
+
+  const profileOptions = (profiles ?? [])
+    .filter((p) => p.enabled === 1)
+    .map((p) => ({ value: p.slug, label: p.name }));
 
   if (loading) return <LoadingState />;
 
@@ -87,6 +99,25 @@ export function ConfigPage() {
             <p className="mt-1 text-xs text-stone-400">
               Maximum number of times an agent can request a review in a single MCP session.
               Prevents runaway review loops. Default: 5.
+            </p>
+          </FormField>
+          <FormField label="Fallback Profile">
+            {profileOptions.length > 0 ? (
+              <Select
+                value={form.fallbackProfile ?? "general"}
+                onValueChange={(v) => setForm({ ...form, fallbackProfile: v })}
+                options={profileOptions}
+              />
+            ) : (
+              <input
+                type="text"
+                value={form.fallbackProfile ?? "general"}
+                onChange={(e) => setForm({ ...form, fallbackProfile: e.target.value })}
+                placeholder="general"
+              />
+            )}
+            <p className="mt-1 text-xs text-stone-400">
+              The reviewer profile to use when no other profiles match the changed files.
             </p>
           </FormField>
           <EnvNote />

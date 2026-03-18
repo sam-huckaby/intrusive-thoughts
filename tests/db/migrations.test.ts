@@ -54,4 +54,27 @@ describe("runMigrations", () => {
     const row = db.query("SELECT applied_at FROM schema_version WHERE version = 1").get() as { applied_at: string };
     expect(row.applied_at).toBeTruthy();
   });
+
+  it("migration v3 seeds fallbackProfile config key", () => {
+    const db = freshDb();
+    runMigrations(db);
+    const row = db.query("SELECT value FROM config WHERE key = 'fallbackProfile'").get() as { value: string } | null;
+    expect(row).not.toBeNull();
+    expect(row!.value).toBe("general");
+  });
+
+  it("migration v3 is recorded in schema_version", () => {
+    const db = freshDb();
+    runMigrations(db);
+    const row = db.query("SELECT version FROM schema_version WHERE version = 3").get() as { version: number } | null;
+    expect(row).not.toBeNull();
+    expect(row!.version).toBe(3);
+  });
+
+  it("all three migrations are applied", () => {
+    const db = freshDb();
+    runMigrations(db);
+    const rows = db.query("SELECT version FROM schema_version ORDER BY version").all() as Array<{ version: number }>;
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3]);
+  });
 });

@@ -7,6 +7,7 @@ interface ReviewSummary {
   id: number;
   task_summary: string;
   verdict: string;
+  result_json: string;
   files_reviewed: string;
   provider: string;
   model: string;
@@ -57,6 +58,7 @@ function ReviewTable({ reviews, onSelect }: { reviews: ReviewSummary[]; onSelect
         <thead>
           <tr className="border-b border-stone-200 bg-stone-50/60 text-left text-xs font-medium uppercase tracking-wider text-stone-400">
             <th className="px-5 py-3">Date</th>
+            <th className="px-5 py-3">Reviewer</th>
             <th className="px-5 py-3">Verdict</th>
             <th className="px-5 py-3">Files</th>
             <th className="px-5 py-3">Summary</th>
@@ -73,6 +75,7 @@ function ReviewTable({ reviews, onSelect }: { reviews: ReviewSummary[]; onSelect
 }
 
 function ReviewRow({ review, onSelect }: { review: ReviewSummary; onSelect: (id: number) => void }) {
+  const profileName = parseProfileName(review.result_json);
   return (
     <tr
       onClick={() => onSelect(review.id)}
@@ -80,6 +83,12 @@ function ReviewRow({ review, onSelect }: { review: ReviewSummary; onSelect: (id:
     >
       <td className="px-5 py-3.5 text-stone-500">
         {formatDate(review.created_at)}
+      </td>
+      <td className="px-5 py-3.5">
+        {profileName
+          ? <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">{profileName}</span>
+          : <span className="text-stone-300">&mdash;</span>
+        }
       </td>
       <td className="px-5 py-3.5">
         <VerdictBadge verdict={review.verdict} />
@@ -103,6 +112,15 @@ function EmptyState() {
       </p>
     </Card>
   );
+}
+
+function parseProfileName(resultJson: string): string | null {
+  try {
+    const parsed = JSON.parse(resultJson);
+    return parsed.profileName ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function formatDate(dateStr: string): string {

@@ -18,6 +18,8 @@ import {
 export interface ReviewerOptions {
   provider: LLMProvider;
   promptPath: string;
+  /** If set, use this string as the prompt template instead of loading from promptPath. */
+  promptContent?: string;
   maxDiffLines: number;
   chunkSize: number;
   previousReviews?: ReviewResult[];
@@ -36,7 +38,7 @@ export async function reviewCode(
   context: ReviewContext,
   options: ReviewerOptions,
 ): Promise<ReviewResult> {
-  const template = await loadPromptTemplate(options.promptPath);
+  const template = options.promptContent ?? await loadPromptTemplate(options.promptPath);
   const chunks = buildChunks(context, options);
   if (chunks.length <= 1) {
     return performSingleReview(context, template, options.provider, options.previousReviews);

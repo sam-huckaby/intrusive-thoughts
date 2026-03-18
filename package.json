@@ -18,7 +18,9 @@
     "@modelcontextprotocol/sdk": "^1.12.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "gray-matter": "^4.0.3",
     "openai": "^4.77.0",
+    "picomatch": "^4.0.3",
     "simple-git": "^3.27.0",
     "zod": "^3.24.0"
   },
@@ -31,6 +33,7 @@
     "@types/bun": "^1.2.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/picomatch": "^4.0.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/supertest": "^6.0.2",

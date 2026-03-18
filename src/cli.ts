@@ -6,13 +6,14 @@ export interface ParsedArgs {
   baseBranch?: string;
   dir?: string;
   port?: number;
+  reviewers?: string[];
 }
 
 const HELP_TEXT = `
 intrusive-thoughts — AI Code Review Tool (let the voices guide you)
 
 Usage:
-  intrusive-thoughts review --summary "..." [--base main] [--dir /path]
+  intrusive-thoughts review --summary "..." [--base main] [--dir /path] [--reviewers slug1,slug2]
   intrusive-thoughts serve [--port 3456]
   intrusive-thoughts mcp
 
@@ -22,11 +23,12 @@ Modes:
   mcp       Start as an MCP server over stdio
 
 Options:
-  --summary   Task summary for the review (required for review mode)
-  --base      Base branch to diff against (default: from config)
-  --dir       Working directory / git repo path (default: cwd)
-  --port      HTTP server port (default: from config, usually 3456)
-  --help      Show this help message
+  --summary     Task summary for the review (required for review mode)
+  --base        Base branch to diff against (default: from config)
+  --dir         Working directory / git repo path (default: cwd)
+  --reviewers   Comma-separated profile slugs to use (default: auto-match)
+  --port        HTTP server port (default: from config, usually 3456)
+  --help        Show this help message
 `.trim();
 
 /**
@@ -60,6 +62,7 @@ interface Flags {
   base?: string;
   dir?: string;
   port?: string;
+  reviewers?: string;
 }
 
 function parseFlags(args: string[]): Flags {
@@ -70,6 +73,7 @@ function parseFlags(args: string[]): Flags {
       base: { type: "string" },
       dir: { type: "string" },
       port: { type: "string" },
+      reviewers: { type: "string" },
     },
     strict: false,
   });
@@ -83,5 +87,8 @@ function buildParsedArgs(mode: ParsedArgs["mode"], flags: Flags): ParsedArgs {
     baseBranch: flags.base,
     dir: flags.dir,
     port: flags.port ? Number(flags.port) : undefined,
+    reviewers: flags.reviewers
+      ? flags.reviewers.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined,
   };
 }

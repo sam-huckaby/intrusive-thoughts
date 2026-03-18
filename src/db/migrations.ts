@@ -26,6 +26,13 @@ const MIGRATIONS: Migration[] = [
       `INSERT OR IGNORE INTO config (key, value) VALUES ('maxReviewRounds', '5')`,
     ],
   },
+  {
+    version: 3,
+    description: "Add reviewer profiles system and fallbackProfile config",
+    up: [
+      `INSERT OR IGNORE INTO config (key, value) VALUES ('fallbackProfile', 'general')`,
+    ],
+  },
 ];
 
 function getAppliedVersions(db: Database): Set<number> {

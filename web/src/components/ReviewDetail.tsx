@@ -23,6 +23,22 @@ interface ReviewResult {
   confidence: number;
 }
 
+interface ProfileReviewResult extends ReviewResult {
+  profile: string;
+  profileName: string;
+}
+
+function parseResultJson(json: string): { result: ReviewResult; profileName: string | null } {
+  const parsed = JSON.parse(json);
+  // New format has profile/profileName fields alongside the review data
+  if (parsed.profile && parsed.profileName) {
+    const { profile: _p, profileName, ...reviewData } = parsed as ProfileReviewResult;
+    return { result: reviewData as ReviewResult, profileName };
+  }
+  // Old format is a plain ReviewResult
+  return { result: parsed as ReviewResult, profileName: null };
+}
+
 export function ReviewDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,12 +47,12 @@ export function ReviewDetail() {
   if (loading) return <LoadingState />;
   if (!review) return <NotFoundState />;
 
-  const result: ReviewResult = JSON.parse(review.result_json);
+  const { result, profileName } = parseResultJson(review.result_json);
 
   return (
     <div>
       <BackButton onClick={() => navigate("/reviews")} />
-      <ReviewHeader review={review} result={result} />
+      <ReviewHeader review={review} result={result} profileName={profileName} />
       <div className="mt-6 space-y-6">
         <SummarySection text={result.summary} />
         <CommentsSection comments={result.comments} />
@@ -74,12 +90,20 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ReviewHeader({ review, result }: { review: Review; result: ReviewResult }) {
+function ReviewHeader({ review, result, profileName }: { review: Review; result: ReviewResult; profileName: string | null }) {
   return (
     <div>
       <h2 className="text-xl font-semibold text-stone-900">{review.task_summary}</h2>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <VerdictBadge verdict={result.verdict} />
+        {profileName && (
+          <>
+            <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">
+              {profileName}
+            </span>
+            <MetaSeparator />
+          </>
+        )}
         <MetaItem label="Confidence" value={`${Math.round(result.confidence * 100)}%`} />
         <MetaSeparator />
         <MetaItem label="Provider" value={`${review.provider}/${review.model}`} />

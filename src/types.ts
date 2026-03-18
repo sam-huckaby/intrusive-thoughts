@@ -112,6 +112,43 @@ export interface ChunkReviewResult {
   issues: string[];
 }
 
+// ─── Reviewer Profiles ───────────────────────────────────
+
+export interface ReviewerProfile {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  prompt: string;
+  filePatterns: string[];
+  enabled: boolean;
+  sourceHash: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProfileReviewResult {
+  profile: string;
+  profileName: string;
+  review: ReviewResult;
+  isFollowUp: boolean;
+  previouslyAcceptedAtRound: number | null;
+}
+
+export interface AcceptedProfile {
+  profile: string;
+  profileName: string;
+  acceptedAtRound: number;
+}
+
+export interface MultiReviewResult {
+  reviews: ProfileReviewResult[];
+  accepted: AcceptedProfile[];
+  allAccepted: boolean;
+  fallbackUsed: boolean;
+  fallbackWarning: string | null;
+}
+
 // ─── Configuration ───────────────────────────────────────
 
 export interface AppConfig {
@@ -122,4 +159,5 @@ export interface AppConfig {
   chunkSize: number;
   httpPort: number;
   maxReviewRounds: number;
+  fallbackProfile: string;
 }
