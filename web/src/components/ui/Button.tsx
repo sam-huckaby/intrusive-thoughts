@@ -21,7 +21,7 @@ const SIZE_CLASSES: Record<ButtonSize, string> = {
   md: "px-4 py-2 text-sm",
 };
 
-const BASE_CLASSES = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+const BASE_CLASSES = "cursor-pointer inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button({ className, variant = "primary", size = "md", ...props }, ref) {

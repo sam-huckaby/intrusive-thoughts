@@ -64,8 +64,8 @@ export function getProfileRules(
 ): ReviewRule[] {
   const rows = db
     .query(
-      `SELECT r.id, r.name, r.description, r.category, r.severity,
-              r.enabled, r.created_at, r.updated_at
+      `SELECT r.id, r.slug, r.name, r.description, r.category, r.severity,
+              r.enabled, r.source_hash, r.created_at, r.updated_at
        FROM rules r
        JOIN profile_rules pr ON pr.rule_id = r.id
        WHERE pr.profile_id = ? AND r.enabled = 1
@@ -93,11 +93,13 @@ interface RawProfileRow {
 
 interface RawRuleRow {
   id: number;
+  slug: string | null;
   name: string;
   description: string;
   category: string;
   severity: string;
   enabled: number;
+  source_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -120,11 +122,13 @@ function rowToProfile(row: RawProfileRow): ReviewerProfile {
 function rowToRule(row: RawRuleRow): ReviewRule {
   return {
     id: row.id,
+    slug: row.slug ?? null,
     name: row.name,
     description: row.description,
     category: row.category as ReviewRule["category"],
     severity: row.severity as ReviewRule["severity"],
     enabled: row.enabled === 1,
+    sourceHash: row.source_hash ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

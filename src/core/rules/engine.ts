@@ -3,11 +3,13 @@ import type { ReviewRule } from "../../types";
 
 interface RuleRow {
   id: number;
+  slug: string | null;
   name: string;
   description: string;
   category: string;
   severity: string;
   enabled: number;
+  source_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -28,11 +30,13 @@ export function getEnabledRules(db: Database): ReviewRule[] {
 function rowToRule(row: RuleRow): ReviewRule {
   return {
     id: row.id,
+    slug: row.slug ?? null,
     name: row.name,
     description: row.description,
     category: row.category as ReviewRule["category"],
     severity: row.severity as ReviewRule["severity"],
     enabled: row.enabled === 1,
+    sourceHash: row.source_hash ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

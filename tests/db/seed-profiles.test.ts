@@ -5,7 +5,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { createTestDb } from "./helpers";
 import { seedProfiles } from "../../src/db/seed-profiles";
-import { seedDefaultRules } from "../../src/db/seed";
+import { seedTestRules } from "./helpers";
 import { computeHash } from "../../src/core/profiles/frontmatter";
 
 const GENERAL_PROFILE = `---
@@ -96,7 +96,7 @@ describe("seedProfiles", () => {
 
   beforeEach(async () => {
     db = createTestDb();
-    seedDefaultRules(db);
+    seedTestRules(db);
     dir = await createTempReviewersDir();
   });
 

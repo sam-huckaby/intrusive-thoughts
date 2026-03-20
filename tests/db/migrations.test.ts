@@ -71,10 +71,62 @@ describe("runMigrations", () => {
     expect(row!.version).toBe(3);
   });
 
-  it("all three migrations are applied", () => {
+  it("all migrations are applied", () => {
     const db = freshDb();
     runMigrations(db);
     const rows = db.query("SELECT version FROM schema_version ORDER BY version").all() as Array<{ version: number }>;
-    expect(rows.map((r) => r.version)).toEqual([1, 2, 3]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("migration v4 adds slug and source_hash columns to rules", () => {
+    const db = freshDb();
+    runMigrations(db);
+    // Insert a rule to verify new columns exist and accept values
+    db.run(
+      "INSERT INTO rules (slug, name, description, category, severity, source_hash) VALUES (?, ?, ?, ?, ?, ?)",
+      ["test-rule", "Test Rule", "A test", "general", "warning", "abc123"],
+    );
+    const row = db.query("SELECT slug, source_hash FROM rules WHERE slug = ?").get("test-rule") as { slug: string; source_hash: string };
+    expect(row.slug).toBe("test-rule");
+    expect(row.source_hash).toBe("abc123");
+  });
+
+  it("migration v4 backfills slugs for existing rules", () => {
+    const db = freshDb();
+    // Insert a rule before running migrations so v4 backfills it
+    db.run(
+      "INSERT INTO rules (name, description, category, severity) VALUES (?, ?, ?, ?)",
+      ["No magic numbers", "Desc", "general", "warning"],
+    );
+    runMigrations(db);
+    const row = db.query("SELECT slug FROM rules WHERE name = ?").get("No magic numbers") as { slug: string };
+    expect(row.slug).toBe("no-magic-numbers");
+  });
+
+  it("migration v4 creates rule_updates table", () => {
+    const db = freshDb();
+    runMigrations(db);
+    // Insert into rule_updates to prove the table exists
+    db.run(
+      "INSERT INTO rules (slug, name, description) VALUES (?, ?, ?)",
+      ["r1", "R1", "Desc"],
+    );
+    const rule = db.query("SELECT id FROM rules WHERE slug = ?").get("r1") as { id: number };
+    db.run(
+      "INSERT INTO rule_updates (rule_id, new_hash, new_content) VALUES (?, ?, ?)",
+      [rule.id, "hash123", '{"name":"Updated"}'],
+    );
+    const update = db.query("SELECT * FROM rule_updates WHERE rule_id = ?").get(rule.id) as { new_hash: string; dismissed: number };
+    expect(update.new_hash).toBe("hash123");
+    expect(update.dismissed).toBe(0);
+  });
+
+  it("migration v4 enforces unique slug index", () => {
+    const db = freshDb();
+    runMigrations(db);
+    db.run("INSERT INTO rules (slug, name, description) VALUES (?, ?, ?)", ["unique-slug", "Rule 1", "Desc"]);
+    expect(() => {
+      db.run("INSERT INTO rules (slug, name, description) VALUES (?, ?, ?)", ["unique-slug", "Rule 2", "Desc"]);
+    }).toThrow();
   });
 });

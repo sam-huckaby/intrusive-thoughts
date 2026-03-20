@@ -3,11 +3,13 @@ import { Database } from "bun:sqlite";
 const TABLES = [
   `CREATE TABLE IF NOT EXISTS rules (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT,
     name        TEXT NOT NULL,
     description TEXT NOT NULL,
     category    TEXT NOT NULL DEFAULT 'general',
     severity    TEXT NOT NULL DEFAULT 'warning',
     enabled     INTEGER NOT NULL DEFAULT 1,
+    source_hash TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`,

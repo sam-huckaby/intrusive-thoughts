@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { createTestDb } from "../../db/helpers";
-import { seedDefaultRules } from "../../../src/db/seed";
+import { seedTestRules } from "../../db/helpers";
 import {
   getEnabledProfiles,
   getProfileBySlug,
@@ -201,7 +201,7 @@ describe("getProfileRules", () => {
 
   beforeEach(() => {
     db = createTestDb();
-    seedDefaultRules(db);
+    seedTestRules(db);
   });
 
   it("returns empty array when no rules are linked", () => {

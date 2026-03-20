@@ -4,7 +4,7 @@ import { openDatabase, getDefaultDbPath } from "./db/index";
 import { runMultiReview } from "./core/review-multi";
 import { startHttpServer } from "./server/http";
 import { startMcpServer } from "./server/mcp";
-import { seedDefaultRules } from "./db/seed";
+import { seedRules } from "./db/seed-rules";
 import { seedProfiles } from "./db/seed-profiles";
 
 /**
@@ -15,7 +15,7 @@ import { seedProfiles } from "./db/seed-profiles";
 export async function main(): Promise<void> {
   const args = parseArgs(process.argv);
   const db = openDatabase(getDefaultDbPath());
-  seedDefaultRules(db);
+  await seedRules(db, resolveRulesDir());
   await seedProfiles(db, resolveReviewersDir());
   const promptPath = resolvePromptPath();
   switch (args.mode) {
@@ -27,6 +27,10 @@ export async function main(): Promise<void> {
 
 function resolvePromptPath(): string {
   return join(import.meta.dir, "..", "prompts", "code-review.md");
+}
+
+function resolveRulesDir(): string {
+  return join(import.meta.dir, "..", "prompts", "rules");
 }
 
 function resolveReviewersDir(): string {

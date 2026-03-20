@@ -61,11 +61,13 @@ export interface DiffStats {
 
 export interface ReviewRule {
   id: number;
+  slug: string | null;
   name: string;
   description: string;
   category: RuleCategory;
   severity: RuleSeverity;
   enabled: boolean;
+  sourceHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -44,19 +44,21 @@ export function RuleForm({ initial, onSubmit, onCancel }: RuleFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <FormField label="Name">
         <input
-          type="text"
-          value={form.name}
+          className="w-full"
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder="Rule name"
+          type="text"
+          value={form.name}
           required
         />
       </FormField>
       <FormField label="Description">
         <textarea
-          value={form.description}
+          className="w-full"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          rows={3}
           placeholder="What should this rule check for?"
+          rows={3}
+          value={form.description}
           required
         />
       </FormField>

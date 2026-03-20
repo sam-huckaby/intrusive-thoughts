@@ -2,26 +2,39 @@ import { useState } from "react";
 import { useApi, apiPost, apiDelete, apiPatch, apiPut } from "../hooks/useApi";
 import { RuleForm } from "./RuleForm";
 import { Button } from "./ui/Button";
-import { CategoryBadge, SeverityBadge } from "./ui/Badge";
+import { Badge, CategoryBadge, SeverityBadge } from "./ui/Badge";
 import { Switch } from "./ui/Switch";
 import { Card } from "./ui/Card";
 import { Dialog, DialogTitle, DialogDescription } from "./ui/Dialog";
 
 interface Rule {
   id: number;
+  slug: string | null;
   name: string;
   description: string;
   category: string;
   severity: string;
   enabled: number;
+  update_available: number;
+}
+
+interface RuleUpdate {
+  id: number;
+  rule_id: number;
+  new_hash: string;
+  new_content: string;
+  detected_at: string;
 }
 
 export function RulesPage() {
   const { data: rules, loading, refetch } = useApi<Rule[]>("/api/rules");
   const [showForm, setShowForm] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [viewingUpdates, setViewingUpdates] = useState<Rule | null>(null);
 
   if (loading) return <LoadingState />;
+
+  const hasUpdates = (rules ?? []).some((r) => r.update_available > 0);
 
   function openCreate() {
     setEditingRule(null);
@@ -46,6 +59,7 @@ export function RulesPage() {
   return (
     <div>
       <PageHeader onAdd={openCreate} />
+      {hasUpdates && <UpdateBanner />}
       <RuleFormDialog
         open={showForm}
         onOpenChange={setShowForm}
@@ -53,11 +67,17 @@ export function RulesPage() {
         onSubmit={handleSubmit}
         onCancel={() => setShowForm(false)}
       />
+      <UpdateDialog
+        rule={viewingUpdates}
+        onClose={() => setViewingUpdates(null)}
+        onDone={() => { setViewingUpdates(null); refetch(); }}
+      />
       <RulesTable
         rules={rules ?? []}
         onEdit={openEdit}
         onDelete={async (id) => { await apiDelete(`/api/rules/${id}`); refetch(); }}
         onToggle={async (id) => { await apiPatch(`/api/rules/${id}/toggle`); refetch(); }}
+        onViewUpdates={setViewingUpdates}
       />
     </div>
   );
@@ -82,6 +102,17 @@ function PageHeader({ onAdd }: { onAdd: () => void }) {
         </p>
       </div>
       <Button onClick={onAdd}>Add Rule</Button>
+    </div>
+  );
+}
+
+function UpdateBanner() {
+  return (
+    <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+      </svg>
+      Some rules have updates available from the team's rule definitions.
     </div>
   );
 }
@@ -112,14 +143,71 @@ function RuleFormDialog({ open, onOpenChange, editingRule, onSubmit, onCancel }:
   );
 }
 
+interface UpdateDialogProps {
+  rule: Rule | null;
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function UpdateDialog({ rule, onClose, onDone }: UpdateDialogProps) {
+  const { data: updates, loading } = useApi<RuleUpdate[]>(
+    rule ? `/api/rules/${rule.id}/updates` : "",
+  );
+
+  if (!rule) return null;
+
+  async function handleAdopt(updateId: number) {
+    await apiPost(`/api/rules/${rule!.id}/updates/${updateId}/adopt`, {});
+    onDone();
+  }
+
+  async function handleDismiss(updateId: number) {
+    await apiPost(`/api/rules/${rule!.id}/updates/${updateId}/dismiss`, {});
+    onDone();
+  }
+
+  return (
+    <Dialog open={!!rule} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogTitle>Updates for "{rule.name}"</DialogTitle>
+      <DialogDescription>
+        The on-disk rule definition has changed. Review and adopt or dismiss the update.
+      </DialogDescription>
+      <div className="mt-4 space-y-3">
+        {loading && <p className="text-sm text-stone-400">Loading...</p>}
+        {updates?.map((update) => {
+          const content = JSON.parse(update.new_content);
+          return (
+            <div key={update.id} className="rounded-lg border border-stone-200 p-4">
+              <div className="space-y-1.5 text-sm">
+                <p><span className="font-medium text-stone-600">Name:</span> {content.name}</p>
+                <p><span className="font-medium text-stone-600">Description:</span> {content.description}</p>
+                <p><span className="font-medium text-stone-600">Category:</span> {content.category}</p>
+                <p><span className="font-medium text-stone-600">Severity:</span> {content.severity}</p>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" onClick={() => handleAdopt(update.id)}>Adopt</Button>
+                <Button size="sm" variant="secondary" onClick={() => handleDismiss(update.id)}>Dismiss</Button>
+              </div>
+            </div>
+          );
+        })}
+        {!loading && updates?.length === 0 && (
+          <p className="text-sm text-stone-400">No pending updates.</p>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
 interface RulesTableProps {
   rules: Rule[];
   onEdit: (r: Rule) => void;
   onDelete: (id: number) => void;
   onToggle: (id: number) => void;
+  onViewUpdates: (r: Rule) => void;
 }
 
-function RulesTable({ rules, onEdit, onDelete, onToggle }: RulesTableProps) {
+function RulesTable({ rules, onEdit, onDelete, onToggle, onViewUpdates }: RulesTableProps) {
   if (rules.length === 0) return <EmptyState />;
   return (
     <Card>
@@ -127,7 +215,7 @@ function RulesTable({ rules, onEdit, onDelete, onToggle }: RulesTableProps) {
         <TableHead />
         <tbody className="divide-y divide-stone-100">
           {rules.map((rule) => (
-            <RuleRow key={rule.id} rule={rule} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} />
+            <RuleRow key={rule.id} rule={rule} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} onViewUpdates={onViewUpdates} />
           ))}
         </tbody>
       </table>
@@ -154,13 +242,21 @@ interface RuleRowProps {
   onEdit: (r: Rule) => void;
   onDelete: (id: number) => void;
   onToggle: (id: number) => void;
+  onViewUpdates: (r: Rule) => void;
 }
 
-function RuleRow({ rule, onEdit, onDelete, onToggle }: RuleRowProps) {
+function RuleRow({ rule, onEdit, onDelete, onToggle, onViewUpdates }: RuleRowProps) {
   return (
     <tr className="group transition-colors hover:bg-stone-50/80">
       <td className="px-5 py-3.5">
-        <span className="font-medium text-stone-800">{rule.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-stone-800">{rule.name}</span>
+          {rule.update_available > 0 && (
+            <button onClick={() => onViewUpdates(rule)} className="cursor-pointer">
+              <Badge variant="warning">Update</Badge>
+            </button>
+          )}
+        </div>
         <p className="mt-0.5 text-xs text-stone-400 line-clamp-1">{rule.description}</p>
       </td>
       <td className="px-5 py-3.5">

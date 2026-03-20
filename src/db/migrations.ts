@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 interface Migration {
   version: number;
   description: string;
-  up: string[];
+  up: string[] | ((db: Database) => void);
 }
 
 const MIGRATIONS: Migration[] = [
@@ -33,6 +33,32 @@ const MIGRATIONS: Migration[] = [
       `INSERT OR IGNORE INTO config (key, value) VALUES ('fallbackProfile', 'general')`,
     ],
   },
+  {
+    version: 4,
+    description: "Add slug and source_hash to rules, create rule_updates table",
+    up: (db: Database) => {
+      // Add columns if they don't already exist (schema.ts may have created them for fresh DBs)
+      const columns = db.query("PRAGMA table_info(rules)").all() as Array<{ name: string }>;
+      const columnNames = new Set(columns.map((c) => c.name));
+      if (!columnNames.has("slug")) {
+        db.run("ALTER TABLE rules ADD COLUMN slug TEXT");
+      }
+      if (!columnNames.has("source_hash")) {
+        db.run("ALTER TABLE rules ADD COLUMN source_hash TEXT");
+      }
+      // Backfill slugs from existing rule names (approximate — seeder corrects on first run)
+      db.run(`UPDATE rules SET slug = LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '.', ''), '''', '')) WHERE slug IS NULL`);
+      db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_slug ON rules(slug) WHERE slug IS NOT NULL`);
+      db.run(`CREATE TABLE IF NOT EXISTS rule_updates (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_id     INTEGER NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+        new_hash    TEXT NOT NULL,
+        new_content TEXT NOT NULL,
+        dismissed   INTEGER NOT NULL DEFAULT 0,
+        detected_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
 ];
 
 function getAppliedVersions(db: Database): Set<number> {
@@ -41,8 +67,12 @@ function getAppliedVersions(db: Database): Set<number> {
 }
 
 function applyMigration(db: Database, migration: Migration): void {
-  for (const sql of migration.up) {
-    db.run(sql);
+  if (typeof migration.up === "function") {
+    migration.up(db);
+  } else {
+    for (const sql of migration.up) {
+      db.run(sql);
+    }
   }
   db.run(
     "INSERT INTO schema_version (version) VALUES (?)",

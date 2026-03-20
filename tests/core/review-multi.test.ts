@@ -1,6 +1,6 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 import { createTestDb } from "../db/helpers";
-import { seedDefaultRules } from "../../src/db/seed";
+import { seedTestRules } from "../db/helpers";
 import type { Database } from "bun:sqlite";
 
 const APPROVE_RESPONSE = JSON.stringify({
@@ -106,7 +106,7 @@ function getRuleId(db: Database, name: string): number {
 
 beforeEach(() => {
   db = createTestDb();
-  seedDefaultRules(db);
+  seedTestRules(db);
   process.env.ANTHROPIC_API_KEY = "test-key-for-multi-review";
   llmCalls = [];
 });

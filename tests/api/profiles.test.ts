@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import supertest from "supertest";
 import { createApp } from "../../src/server/http";
 import { createTestDb } from "../db/helpers";
-import { seedDefaultRules } from "../../src/db/seed";
+import { seedTestRules } from "../db/helpers";
 import type { Database } from "bun:sqlite";
 import { join } from "path";
 
@@ -12,7 +12,7 @@ let request: ReturnType<typeof supertest>;
 
 beforeEach(() => {
   db = createTestDb();
-  seedDefaultRules(db);
+  seedTestRules(db);
   const app = createApp({ db, promptPath: PROMPT_PATH });
   request = supertest(app);
 });

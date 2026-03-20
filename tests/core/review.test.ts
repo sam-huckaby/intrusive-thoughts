@@ -1,7 +1,7 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 import { join } from "path";
 import { createTestDb } from "../db/helpers";
-import { seedDefaultRules } from "../../src/db/seed";
+import { seedTestRules } from "../db/helpers";
 import type { Database } from "bun:sqlite";
 
 const APPROVE_RESPONSE = JSON.stringify({
@@ -52,7 +52,7 @@ let db: Database;
 
 beforeEach(() => {
   db = createTestDb();
-  seedDefaultRules(db);
+  seedTestRules(db);
   // Set ANTHROPIC_API_KEY for the test
   process.env.ANTHROPIC_API_KEY = "test-key-for-review";
 });
