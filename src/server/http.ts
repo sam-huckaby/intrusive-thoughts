@@ -10,6 +10,8 @@ export interface HttpServerOptions {
   promptPath: string;
   staticDir?: string;
   port?: number;
+  /** Writable user config directory for prompt edits (null if unavailable) */
+  userConfigDir?: string | null;
 }
 
 /**
@@ -21,7 +23,7 @@ export function createApp(options: HttpServerOptions): Express {
   const app = express();
   app.use(cors());
   app.use(express.json());
-  mountRoutes(app, options.db, options.promptPath);
+  mountRoutes(app, options.db, options.promptPath, options.userConfigDir ?? null);
   if (options.staticDir) {
     app.use(express.static(options.staticDir));
     serveFallback(app, options.staticDir);

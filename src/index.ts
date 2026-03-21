@@ -1,11 +1,11 @@
-import { join } from "path";
 import { parseArgs } from "./cli";
-import { openDatabase, getDefaultDbPath } from "./db/index";
+import { openDatabase } from "./db/index";
 import { runMultiReview } from "./core/review-multi";
 import { startHttpServer } from "./server/http";
 import { startMcpServer } from "./server/mcp";
 import { seedRules } from "./db/seed-rules";
 import { seedProfiles } from "./db/seed-profiles";
+import { resolvePaths } from "./paths";
 
 /**
  * Main entrypoint. Detects mode from CLI args and starts
@@ -14,33 +14,25 @@ import { seedProfiles } from "./db/seed-profiles";
  */
 export async function main(): Promise<void> {
   const args = parseArgs(process.argv);
-  const db = openDatabase(getDefaultDbPath());
-  await seedRules(db, resolveRulesDir());
-  await seedProfiles(db, resolveReviewersDir());
-  const promptPath = resolvePromptPath();
+  const paths = resolvePaths({
+    workingDirectory: args.dir,
+    ephemeral: args.ephemeral,
+  });
+
+  const db = openDatabase(paths.dbPath);
+  await seedRules(db, paths.rulesDirs);
+  await seedProfiles(db, paths.reviewersDirs);
+
   switch (args.mode) {
-    case "review": return handleReviewMode(args, db, promptPath);
-    case "serve": return handleServeMode(args, db, promptPath);
-    case "mcp": return startMcpServer({ db, promptPath });
+    case "review": return handleReviewMode(args, db);
+    case "serve": return handleServeMode(args, db, paths.promptPath, paths.staticDir, paths.userConfigDir);
+    case "mcp": return startMcpServer({ db, promptPath: paths.promptPath });
   }
-}
-
-function resolvePromptPath(): string {
-  return join(import.meta.dir, "..", "prompts", "code-review.md");
-}
-
-function resolveRulesDir(): string {
-  return join(import.meta.dir, "..", "prompts", "rules");
-}
-
-function resolveReviewersDir(): string {
-  return join(import.meta.dir, "..", "prompts", "reviewers");
 }
 
 async function handleReviewMode(
   args: ReturnType<typeof parseArgs>,
   db: ReturnType<typeof openDatabase>,
-  _promptPath: string,
 ): Promise<void> {
   if (!args.summary) {
     console.error("Error: --summary is required for review mode");
@@ -62,9 +54,10 @@ async function handleServeMode(
   args: ReturnType<typeof parseArgs>,
   db: ReturnType<typeof openDatabase>,
   promptPath: string,
+  staticDir: string,
+  userConfigDir: string | null,
 ): Promise<void> {
-  const staticDir = join(import.meta.dir, "..", "web", "dist");
-  await startHttpServer({ db, promptPath, staticDir, port: args.port });
+  await startHttpServer({ db, promptPath, staticDir, port: args.port, userConfigDir });
 }
 
 main().catch((err) => {

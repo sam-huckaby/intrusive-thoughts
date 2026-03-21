@@ -39,7 +39,7 @@ describe("seedRules", () => {
     await writeRuleFile("rule-a.md", RULE_A);
     await writeRuleFile("rule-b.md", RULE_B);
 
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     const rows = db.query("SELECT slug, name, description, category, severity, source_hash FROM rules ORDER BY slug").all() as any[];
     expect(rows.length).toBe(2);
@@ -54,8 +54,8 @@ describe("seedRules", () => {
   it("is idempotent — running twice does not duplicate rules", async () => {
     await writeRuleFile("rule-a.md", RULE_A);
 
-    await seedRules(db, rulesDir);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
+    await seedRules(db, [rulesDir]);
 
     const count = db.query("SELECT COUNT(*) as count FROM rules").get() as { count: number };
     expect(count.count).toBe(1);
@@ -64,8 +64,8 @@ describe("seedRules", () => {
   it("does not create update notification when file is unchanged", async () => {
     await writeRuleFile("rule-a.md", RULE_A);
 
-    await seedRules(db, rulesDir);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
+    await seedRules(db, [rulesDir]);
 
     const updates = db.query("SELECT COUNT(*) as count FROM rule_updates").get() as { count: number };
     expect(updates.count).toBe(0);
@@ -73,12 +73,12 @@ describe("seedRules", () => {
 
   it("creates update notification when file changes", async () => {
     await writeRuleFile("rule-a.md", RULE_A);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     // Modify the file
     const modified = RULE_A.replace("Description for rule A", "Updated description");
     await writeRuleFile("rule-a.md", modified);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     const updates = db.query("SELECT * FROM rule_updates WHERE dismissed = 0").all() as any[];
     expect(updates.length).toBe(1);
@@ -88,12 +88,12 @@ describe("seedRules", () => {
 
   it("does not duplicate update notification for same change", async () => {
     await writeRuleFile("rule-a.md", RULE_A);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     const modified = RULE_A.replace("Description for rule A", "Updated description");
     await writeRuleFile("rule-a.md", modified);
-    await seedRules(db, rulesDir);
-    await seedRules(db, rulesDir); // third run — same change still pending
+    await seedRules(db, [rulesDir]);
+    await seedRules(db, [rulesDir]); // third run — same change still pending
 
     const updates = db.query("SELECT COUNT(*) as count FROM rule_updates WHERE dismissed = 0").get() as { count: number };
     expect(updates.count).toBe(1);
@@ -101,7 +101,7 @@ describe("seedRules", () => {
 
   it("does not overwrite existing rule data in DB", async () => {
     await writeRuleFile("rule-a.md", RULE_A);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     // Manually update the rule name in DB
     db.run("UPDATE rules SET name = 'Custom Name' WHERE slug = 'rule-a'");
@@ -109,7 +109,7 @@ describe("seedRules", () => {
     // Modify the file
     const modified = RULE_A.replace("Description for rule A", "New desc");
     await writeRuleFile("rule-a.md", modified);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     // DB should still have the custom name — seeder never overwrites
     const row = db.query("SELECT name FROM rules WHERE slug = 'rule-a'").get() as { name: string };
@@ -124,7 +124,7 @@ describe("seedRules", () => {
     );
 
     await writeRuleFile("rule-a.md", RULE_A);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     const rows = db.query("SELECT slug FROM rules ORDER BY slug").all() as any[];
     expect(rows.length).toBe(2);
@@ -132,26 +132,26 @@ describe("seedRules", () => {
   });
 
   it("handles empty rules directory", async () => {
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
     const count = db.query("SELECT COUNT(*) as count FROM rules").get() as { count: number };
     expect(count.count).toBe(0);
   });
 
   it("handles nonexistent rules directory", async () => {
-    await seedRules(db, "/nonexistent/path");
+    await seedRules(db, ["/nonexistent/path"]);
     const count = db.query("SELECT COUNT(*) as count FROM rules").get() as { count: number };
     expect(count.count).toBe(0);
   });
 
   it("does not touch the enabled flag", async () => {
     await writeRuleFile("rule-a.md", RULE_A);
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     // Disable the rule
     db.run("UPDATE rules SET enabled = 0 WHERE slug = 'rule-a'");
 
     // Re-seed — enabled should stay 0
-    await seedRules(db, rulesDir);
+    await seedRules(db, [rulesDir]);
 
     const row = db.query("SELECT enabled FROM rules WHERE slug = 'rule-a'").get() as { enabled: number };
     expect(row.enabled).toBe(0);

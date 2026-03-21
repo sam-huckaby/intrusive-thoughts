@@ -130,8 +130,8 @@ export function ProfileEditor() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave}>Save Profile</Button>
           <SavedIndicator visible={saved} />
+          <Button onClick={handleSave}>Save Profile</Button>
         </div>
       </div>
 
@@ -209,6 +209,7 @@ export function ProfileEditor() {
 
         {/* Right column: Prompt editor + variable reference */}
         <div className="col-span-2 space-y-6">
+          <VariableReference />
           <Card>
             <textarea
               value={prompt}
@@ -217,7 +218,6 @@ export function ProfileEditor() {
               spellCheck={false}
             />
           </Card>
-          <VariableReference />
         </div>
       </div>
     </div>

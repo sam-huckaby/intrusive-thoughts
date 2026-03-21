@@ -14,10 +14,11 @@ export function mountRoutes(
   app: Express,
   db: Database,
   promptPath: string,
+  userConfigDir: string | null,
 ): void {
   app.use("/api/rules", createRulesRouter(db));
   app.use("/api/config", createConfigRouter(db));
-  app.use("/api/prompt", createPromptRouter(promptPath));
+  app.use("/api/prompt", createPromptRouter(promptPath, userConfigDir));
   app.use("/api/reviews", createReviewsRouter(db, promptPath));
   app.use("/api/profiles", createProfilesRouter(db));
 }

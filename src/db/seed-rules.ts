@@ -5,28 +5,31 @@ import { parseRuleFile } from "../core/rules/frontmatter";
 import type { ParsedRule } from "../core/rules/frontmatter";
 
 /**
- * Scans the `prompts/rules/` directory and seeds new rules into the DB.
- * For existing rules, detects when the on-disk file has changed and records
- * a notification in `rule_updates`.
+ * Scans multiple rule directories and seeds rules into the DB.
+ * Directories are processed in reverse order (lowest priority first)
+ * so that higher-priority directories override lower ones by slug.
  *
  * This is idempotent and safe to call on every startup.
  * @sideeffect Reads filesystem, writes to database
  */
 export async function seedRules(
   db: Database,
-  rulesDir: string,
+  rulesDirs: string[],
 ): Promise<void> {
-  const files = await listRuleFiles(rulesDir);
-  for (const filename of files) {
-    const filePath = join(rulesDir, filename);
-    const content = await readFile(filePath, "utf-8");
-    const parsed = parseRuleFile(content, filename);
-    const existing = getExistingRule(db, parsed.slug);
+  // Process in reverse so highest-priority dirs (first in array) win
+  for (const rulesDir of [...rulesDirs].reverse()) {
+    const files = await listRuleFiles(rulesDir);
+    for (const filename of files) {
+      const filePath = join(rulesDir, filename);
+      const content = await readFile(filePath, "utf-8");
+      const parsed = parseRuleFile(content, filename);
+      const existing = getExistingRule(db, parsed.slug);
 
-    if (!existing) {
-      insertRule(db, parsed);
-    } else {
-      detectRuleUpdate(db, existing, parsed);
+      if (!existing) {
+        insertRule(db, parsed);
+      } else {
+        detectRuleUpdate(db, existing, parsed);
+      }
     }
   }
 }

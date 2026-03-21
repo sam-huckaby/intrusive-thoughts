@@ -103,7 +103,7 @@ describe("seedProfiles", () => {
   describe("new profile insertion", () => {
     it("inserts a profile from a .md file", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(1);
@@ -115,7 +115,7 @@ describe("seedProfiles", () => {
 
     it("stores the prompt body without frontmatter", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles[0].prompt).toStartWith("You are a general code reviewer.");
@@ -124,7 +124,7 @@ describe("seedProfiles", () => {
 
     it("stores file_patterns as JSON array", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       const patterns = JSON.parse(profiles[0].file_patterns);
@@ -133,7 +133,7 @@ describe("seedProfiles", () => {
 
     it("stores the content hash as source_hash", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles[0].source_hash).toBe(computeHash(GENERAL_PROFILE));
@@ -142,7 +142,7 @@ describe("seedProfiles", () => {
     it("seeds multiple profiles from multiple files", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
       await writeFile(join(dir, "security.md"), SECURITY_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(2);
@@ -153,7 +153,7 @@ describe("seedProfiles", () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
       await writeFile(join(dir, "notes.txt"), "not a profile");
       await writeFile(join(dir, "config.json"), "{}");
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(1);
@@ -163,7 +163,7 @@ describe("seedProfiles", () => {
   describe("rule linking", () => {
     it("links rules that exist in the DB by name", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const linked = queryProfileRules(db, "general");
       const names = linked.map((r) => r.name);
@@ -181,7 +181,7 @@ rules:
 
 Prompt.`;
       await writeFile(join(dir, "custom.md"), profile);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const linked = queryProfileRules(db, "custom");
       // Only the rule that exists in the DB should be linked
@@ -191,7 +191,7 @@ Prompt.`;
 
     it("creates no links when rules array is empty", async () => {
       await writeFile(join(dir, "minimal.md"), MINIMAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const linked = queryProfileRules(db, "minimal");
       expect(linked).toHaveLength(0);
@@ -204,7 +204,7 @@ name: No Rules Profile
 
 Prompt.`;
       await writeFile(join(dir, "norules.md"), profile);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const linked = queryProfileRules(db, "norules");
       expect(linked).toHaveLength(0);
@@ -214,8 +214,8 @@ Prompt.`;
   describe("idempotency", () => {
     it("does not duplicate profiles when run twice", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(1);
@@ -223,8 +223,8 @@ Prompt.`;
 
     it("does not duplicate profile_rules when run twice", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
+      await seedProfiles(db, [dir]);
 
       const linked = queryProfileRules(db, "general");
       // Should still have the same number, not doubled
@@ -236,12 +236,12 @@ Prompt.`;
   describe("change detection", () => {
     it("creates a profile_updates row when file content changes", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       // Modify the file
       const modified = GENERAL_PROFILE + "\nNew line added.";
       await writeFile(join(dir, "general.md"), modified);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const updates = queryProfileUpdates(db, "general");
       expect(updates).toHaveLength(1);
@@ -251,9 +251,9 @@ Prompt.`;
 
     it("does not create an update when content has not changed", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
       // Run again with same content
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const updates = queryProfileUpdates(db, "general");
       expect(updates).toHaveLength(0);
@@ -261,12 +261,12 @@ Prompt.`;
 
     it("does not duplicate update notifications for the same hash", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const modified = GENERAL_PROFILE + "\nNew line.";
       await writeFile(join(dir, "general.md"), modified);
-      await seedProfiles(db, dir);
-      await seedProfiles(db, dir); // Run a third time with same modified content
+      await seedProfiles(db, [dir]);
+      await seedProfiles(db, [dir]); // Run a third time with same modified content
 
       const updates = queryProfileUpdates(db, "general");
       expect(updates).toHaveLength(1);
@@ -274,17 +274,17 @@ Prompt.`;
 
     it("creates a new update for a second distinct change", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       // First change
       const v2 = GENERAL_PROFILE + "\nVersion 2.";
       await writeFile(join(dir, "general.md"), v2);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       // Second change
       const v3 = GENERAL_PROFILE + "\nVersion 3.";
       await writeFile(join(dir, "general.md"), v3);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const updates = queryProfileUpdates(db, "general");
       expect(updates).toHaveLength(2);
@@ -294,13 +294,13 @@ Prompt.`;
 
     it("does not modify the profile row in the DB when content changes", async () => {
       await writeFile(join(dir, "general.md"), GENERAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const before = queryProfiles(db)[0];
 
       const modified = GENERAL_PROFILE + "\nChanged.";
       await writeFile(join(dir, "general.md"), modified);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const after = queryProfiles(db)[0];
       // The DB profile should NOT be updated — only a notification is created
@@ -311,14 +311,14 @@ Prompt.`;
 
   describe("edge cases", () => {
     it("handles empty directory gracefully", async () => {
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(0);
     });
 
     it("handles nonexistent directory gracefully", async () => {
-      await seedProfiles(db, "/tmp/nonexistent-dir-12345");
+      await seedProfiles(db, ["/tmp/nonexistent-dir-12345"]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(0);
@@ -326,7 +326,7 @@ Prompt.`;
 
     it("handles profile with no rules in frontmatter", async () => {
       await writeFile(join(dir, "minimal.md"), MINIMAL_PROFILE);
-      await seedProfiles(db, dir);
+      await seedProfiles(db, [dir]);
 
       const profiles = queryProfiles(db);
       expect(profiles).toHaveLength(1);

@@ -5,29 +5,32 @@ import { parseProfileFile } from "../core/profiles/frontmatter";
 import type { ParsedProfile } from "../core/profiles/frontmatter";
 
 /**
- * Scans the `prompts/reviewers/` directory and seeds new profiles into the DB.
- * For existing profiles, detects when the on-disk file has changed and records
- * a notification in `profile_updates`.
+ * Scans multiple reviewer profile directories and seeds profiles into the DB.
+ * Directories are processed in reverse order (lowest priority first)
+ * so that higher-priority directories override lower ones by slug.
  *
  * This is idempotent and safe to call on every startup.
  * @sideeffect Reads filesystem, writes to database
  */
 export async function seedProfiles(
   db: Database,
-  reviewersDir: string,
+  reviewersDirs: string[],
 ): Promise<void> {
-  const files = await listProfileFiles(reviewersDir);
-  for (const filename of files) {
-    const filePath = join(reviewersDir, filename);
-    const content = await readFile(filePath, "utf-8");
-    const parsed = parseProfileFile(content, filename);
-    const existing = getExistingProfile(db, parsed.slug);
+  // Process in reverse so highest-priority dirs (first in array) win
+  for (const reviewersDir of [...reviewersDirs].reverse()) {
+    const files = await listProfileFiles(reviewersDir);
+    for (const filename of files) {
+      const filePath = join(reviewersDir, filename);
+      const content = await readFile(filePath, "utf-8");
+      const parsed = parseProfileFile(content, filename);
+      const existing = getExistingProfile(db, parsed.slug);
 
-    if (!existing) {
-      insertProfile(db, parsed);
-      linkRulesByName(db, parsed.slug, parsed.rules);
-    } else {
-      detectProfileUpdate(db, existing, parsed);
+      if (!existing) {
+        insertProfile(db, parsed);
+        linkRulesByName(db, parsed.slug, parsed.rules);
+      } else {
+        detectProfileUpdate(db, existing, parsed);
+      }
     }
   }
 }

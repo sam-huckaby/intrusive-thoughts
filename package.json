@@ -6,12 +6,22 @@
   "bin": {
     "intrusive-thoughts": "./bin/intrusive-thoughts.ts"
   },
+  "files": [
+    "dist/",
+    "prompts/",
+    "web/dist/",
+    "bin/",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "bun run src/index.ts serve",
     "dev:web": "vite --config vite.config.ts",
     "mcp": "bun run src/index.ts mcp",
     "build": "bun build src/index.ts --outdir dist --target bun",
-    "build:web": "vite build --config vite.config.ts"
+    "build:web": "vite build --config vite.config.ts",
+    "prepublishOnly": "bun run build && bun run build:web"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
