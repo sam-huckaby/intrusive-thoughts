@@ -13,6 +13,7 @@ import {
   interpolatePrompt,
   buildPromptVariables,
   buildChunkPromptVariables,
+  type PromptCommentOptions,
 } from "./prompt";
 
 export interface ReviewerOptions {
@@ -23,6 +24,7 @@ export interface ReviewerOptions {
   maxDiffLines: number;
   chunkSize: number;
   previousReviews?: ReviewResult[];
+  promptComments?: PromptCommentOptions;
 }
 
 /**
@@ -41,9 +43,9 @@ export async function reviewCode(
   const template = options.promptContent ?? await loadPromptTemplate(options.promptPath);
   const chunks = buildChunks(context, options);
   if (chunks.length <= 1) {
-    return performSingleReview(context, template, options.provider, options.previousReviews);
+    return performSingleReview(context, template, options.provider, options.previousReviews, options.promptComments);
   }
-  return performChunkedReview(context, chunks, template, options.provider, options.previousReviews);
+  return performChunkedReview(context, chunks, template, options.provider, options.previousReviews, options.promptComments);
 }
 
 function buildChunks(context: ReviewContext, options: ReviewerOptions): DiffChunk[] {
@@ -59,8 +61,9 @@ async function performSingleReview(
   template: string,
   provider: LLMProvider,
   previousReviews?: ReviewResult[],
+  promptComments?: PromptCommentOptions,
 ): Promise<ReviewResult> {
-  const variables = buildPromptVariables(context, previousReviews);
+  const variables = buildPromptVariables(context, previousReviews, promptComments);
   const prompt = interpolatePrompt(template, variables);
   const raw = await provider.call(prompt, "Please review the code changes above.");
   return parseReviewResult(raw);
@@ -72,10 +75,11 @@ async function performChunkedReview(
   template: string,
   provider: LLMProvider,
   previousReviews?: ReviewResult[],
+  promptComments?: PromptCommentOptions,
 ): Promise<ReviewResult> {
   const chunkResults: ChunkReviewResult[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    const result = await reviewChunk(context, chunks[i], i, chunks.length, provider, template, previousReviews);
+    const result = await reviewChunk(context, chunks[i], i, chunks.length, provider, template, previousReviews, promptComments);
     chunkResults.push(result);
   }
   return synthesizeChunkResults(chunkResults, context, provider);
@@ -96,8 +100,9 @@ export async function reviewChunk(
   provider: LLMProvider,
   promptTemplate: string,
   previousReviews?: ReviewResult[],
+  promptComments?: PromptCommentOptions,
 ): Promise<ChunkReviewResult> {
-  const variables = buildChunkPromptVariables(context, chunk, chunkIndex, totalChunks, previousReviews);
+  const variables = buildChunkPromptVariables(context, chunk, chunkIndex, totalChunks, previousReviews, promptComments);
   const prompt = interpolatePrompt(promptTemplate, variables);
   const raw = await provider.call(prompt, "Please review this chunk of code changes.");
   return parseChunkResult(raw);

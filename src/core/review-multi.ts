@@ -18,6 +18,8 @@ import {
   getProfileRules,
 } from "./profiles/index";
 import { matchProfiles } from "./profiles/matcher";
+import { getPromptCommentContext } from "./changes/comments";
+import { getSnapshotHeadSha } from "./changes/snapshots";
 
 export interface MultiReviewInput {
   taskSummary: string;
@@ -56,6 +58,8 @@ export async function runMultiReview(
   const workDir = input.workingDirectory ?? process.cwd();
 
   const gitResult = await getGitDiff(workDir, baseBranch);
+  const headSha = getSnapshotHeadSha(workDir);
+  const promptComments = getPromptCommentContext(deps.db, baseBranch, headSha);
   const changedFilePaths = gitResult.files.map((f) => f.path);
 
   // Determine which profiles to run
@@ -93,6 +97,7 @@ export async function runMultiReview(
       maxDiffLines: config.maxDiffLines,
       chunkSize: config.chunkSize,
       previousReviews,
+      promptComments,
     });
 
     results.push({

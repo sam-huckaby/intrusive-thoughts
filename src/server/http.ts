@@ -4,6 +4,7 @@ import cors from "cors";
 import { Database } from "bun:sqlite";
 import { join } from "path";
 import { mountRoutes } from "../api/routes";
+import type { RepoContext } from "../core/context/repo";
 
 export interface HttpServerOptions {
   db: Database;
@@ -12,6 +13,8 @@ export interface HttpServerOptions {
   port?: number;
   /** Writable user config directory for prompt edits (null if unavailable) */
   userConfigDir?: string | null;
+  /** Active repo context for repo-scoped web features */
+  repoContext?: RepoContext | null;
 }
 
 /**
@@ -23,7 +26,7 @@ export function createApp(options: HttpServerOptions): Express {
   const app = express();
   app.use(cors());
   app.use(express.json());
-  mountRoutes(app, options.db, options.promptPath, options.userConfigDir ?? null);
+  mountRoutes(app, options.db, options.promptPath, options.userConfigDir ?? null, options.repoContext ?? null);
   if (options.staticDir) {
     app.use(express.static(options.staticDir));
     serveFallback(app, options.staticDir);

@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { createTestDb } from "../db/helpers";
 import { seedTestRules } from "../db/helpers";
 import type { Database } from "bun:sqlite";
@@ -35,13 +35,6 @@ const SMALL_DIFF = [
 // Track which prompts the mock LLM was called with
 let llmCalls: Array<{ system: string; user: string }> = [];
 
-// Mock simple-git
-mock.module("simple-git", () => ({
-  default: () => ({
-    diff: () => Promise.resolve(SMALL_DIFF),
-  }),
-}));
-
 // Mock the Anthropic SDK — returns approve by default
 mock.module("@anthropic-ai/sdk", () => ({
   default: class MockAnthropic {
@@ -64,6 +57,7 @@ mock.module("@anthropic-ai/sdk", () => ({
 const { runMultiReview } = await import("../../src/core/review-multi");
 
 let db: Database;
+const originalSpawnSync = Bun.spawnSync;
 
 // ─── Helpers ─────────────────────────────────────────────
 
@@ -109,6 +103,28 @@ beforeEach(() => {
   seedTestRules(db);
   process.env.ANTHROPIC_API_KEY = "test-key-for-multi-review";
   llmCalls = [];
+  Bun.spawnSync = ((options: { cmd: string[] }) => {
+    const command = options.cmd.join(" ");
+    if (command.startsWith("git diff ")) {
+      return {
+        exitCode: 0,
+        stdout: new TextEncoder().encode(SMALL_DIFF),
+        stderr: new Uint8Array(),
+      } as ReturnType<typeof Bun.spawnSync>;
+    }
+    if (command === "git rev-parse HEAD") {
+      return {
+        exitCode: 0,
+        stdout: new TextEncoder().encode("test-head\n"),
+        stderr: new Uint8Array(),
+      } as ReturnType<typeof Bun.spawnSync>;
+    }
+    throw new Error(`Unexpected git command in test: ${command}`);
+  }) as typeof Bun.spawnSync;
+});
+
+afterEach(() => {
+  Bun.spawnSync = originalSpawnSync;
 });
 
 describe("runMultiReview", () => {

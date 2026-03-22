@@ -59,6 +59,47 @@ const MIGRATIONS: Migration[] = [
       )`);
     },
   },
+  {
+    version: 5,
+    description: "Add human review snapshot and threaded comment tables",
+    up: [
+      `CREATE TABLE IF NOT EXISTS change_snapshots (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        base_branch    TEXT NOT NULL,
+        head_sha       TEXT NOT NULL,
+        merge_base_sha TEXT NOT NULL,
+        diff_hash      TEXT NOT NULL,
+        created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS change_snapshot_files (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        snapshot_id INTEGER NOT NULL REFERENCES change_snapshots(id) ON DELETE CASCADE,
+        path        TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        additions   INTEGER NOT NULL DEFAULT 0,
+        deletions   INTEGER NOT NULL DEFAULT 0
+      )`,
+      `CREATE TABLE IF NOT EXISTS comment_threads (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        snapshot_id     INTEGER NOT NULL REFERENCES change_snapshots(id) ON DELETE CASCADE,
+        file_path       TEXT NOT NULL,
+        anchor_kind     TEXT NOT NULL,
+        start_line      INTEGER,
+        end_line        INTEGER,
+        state           TEXT NOT NULL DEFAULT 'open',
+        orphaned_reason TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS comment_messages (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id   INTEGER NOT NULL REFERENCES comment_threads(id) ON DELETE CASCADE,
+        author_type TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    ],
+  },
 ];
 
 function getAppliedVersions(db: Database): Set<number> {

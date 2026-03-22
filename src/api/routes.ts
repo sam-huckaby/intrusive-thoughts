@@ -5,6 +5,8 @@ import { createConfigRouter } from "./config";
 import { createPromptRouter } from "./prompt";
 import { createReviewsRouter } from "./reviews";
 import { createProfilesRouter } from "./profiles";
+import { createChangesRouter } from "./changes";
+import type { RepoContext } from "../core/context/repo";
 
 /**
  * Mounts all API route groups onto the Express app.
@@ -15,10 +17,12 @@ export function mountRoutes(
   db: Database,
   promptPath: string,
   userConfigDir: string | null,
+  repoContext: RepoContext | null,
 ): void {
   app.use("/api/rules", createRulesRouter(db));
   app.use("/api/config", createConfigRouter(db));
   app.use("/api/prompt", createPromptRouter(promptPath, userConfigDir));
   app.use("/api/reviews", createReviewsRouter(db, promptPath));
   app.use("/api/profiles", createProfilesRouter(db));
+  app.use("/api/changes", createChangesRouter(db, repoContext));
 }
