@@ -269,8 +269,8 @@ export function ChangesPage() {
     const updated = await apiPatch<Thread>(`/api/changes/threads/${thread.id}`, {
       state: thread.state === "resolved" ? "open" : "resolved",
     });
-      setThreads((prev) => prev.map((item) => item.id === thread.id ? updated : item));
-      setOrphanedThreads((prev) => prev.map((item) => item.id === thread.id ? updated : item));
+    setThreads((prev) => prev.map((item) => item.id === thread.id ? updated : item));
+    setOrphanedThreads((prev) => prev.map((item) => item.id === thread.id ? updated : item));
   }
 
   async function handleToggleExpand(path: string) {
@@ -603,6 +603,7 @@ function ThreadComposer({
         </Button>
       </div>
       <textarea
+        className="w-full"
         rows={4}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -699,7 +700,7 @@ function TinyStatusBadge({ status, large = false }: { status: NonNullable<TreeNo
 
 function LoadingState({ label, compact = false }: { label: string; compact?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-2 text-sm text-stone-500", compact ? "px-4 py-4" : "py-8") }>
+    <div className={cn("flex items-center gap-2 text-sm text-stone-500", compact ? "px-4 py-4" : "py-8")}>
       <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-stone-700" />
       {label}
     </div>

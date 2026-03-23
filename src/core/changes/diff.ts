@@ -82,12 +82,10 @@ function parseHunks(section: string): StructuredDiffHunk[] {
     }
     if (!current) continue;
     if (line.startsWith("\\ No newline at end of file")) continue;
-    current.lines.push(buildStructuredLine(line, () => oldLine++, () => newLine++, oldLine, newLine));
+    current.lines.push(buildStructuredLine(line, oldLine, newLine));
     const last = current.lines[current.lines.length - 1];
-    if (last.type === "context") {
-      oldLine++;
-      newLine++;
-    }
+    if (last.type !== "add") oldLine++;
+    if (last.type !== "delete") newLine++;
   }
 
   return hunks;
@@ -95,8 +93,6 @@ function parseHunks(section: string): StructuredDiffHunk[] {
 
 function buildStructuredLine(
   line: string,
-  _nextOld: () => number,
-  _nextNew: () => number,
   oldLine: number,
   newLine: number,
 ): StructuredDiffLine {
