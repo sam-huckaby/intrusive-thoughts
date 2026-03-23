@@ -30,7 +30,7 @@ export function getSnapshotTree(
   const objectSpec = path ? `${snapshot.head_sha}:${path}` : snapshot.head_sha;
   const output = runGitCommand(repoContext.root, ["ls-tree", objectSpec]);
   const changedFiles = getChangedFiles(db, snapshotId);
-  const nodes = parseLsTreeOutput(output).map((entry) => toTreeNode(entry, changedFiles));
+  const nodes = parseLsTreeOutput(output, path).map((entry) => toTreeNode(entry, changedFiles));
   return {
     snapshotId,
     path,
