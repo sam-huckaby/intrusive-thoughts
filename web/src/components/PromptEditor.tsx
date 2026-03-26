@@ -13,6 +13,8 @@ const TEMPLATE_VARS = [
   { name: "{{is_chunk}}", desc: "Whether this is a partial chunk review" },
   { name: "{{chunk_info}}", desc: "Chunk label, e.g. 'Chunk 2 of 4'" },
   { name: "{{previous_reviews}}", desc: "Formatted history of previous reviews in this session" },
+  { name: "{{user_comments}}", desc: "Active authoritative user comment threads for the current snapshot" },
+  { name: "{{orphaned_user_comments}}", desc: "Orphaned unresolved user comment threads for the current snapshot" },
 ];
 
 export function PromptEditor() {

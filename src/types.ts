@@ -163,3 +163,78 @@ export interface AppConfig {
   maxReviewRounds: number;
   fallbackProfile: string;
 }
+
+// ─── Human Review Workspace ──────────────────────────────
+
+export type ChangeSnapshotFileStatus = ChangedFile["status"];
+
+export interface ChangeSnapshot {
+  id: number;
+  baseBranch: string;
+  headSha: string;
+  mergeBaseSha: string;
+  diffHash: string;
+  createdAt: string;
+}
+
+export interface ChangeSnapshotFile {
+  id: number;
+  snapshotId: number;
+  path: string;
+  status: ChangeSnapshotFileStatus;
+  additions: number;
+  deletions: number;
+}
+
+export type CommentThreadAnchorKind = "file" | "line" | "range";
+export type CommentThreadState = "open" | "resolved" | "orphaned";
+export type CommentAuthorType = "user" | "agent";
+
+export interface CommentThread {
+  id: number;
+  snapshotId: number;
+  filePath: string;
+  anchorKind: CommentThreadAnchorKind;
+  startLine: number | null;
+  endLine: number | null;
+  state: CommentThreadState;
+  orphanedReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommentMessage {
+  id: number;
+  threadId: number;
+  authorType: CommentAuthorType;
+  body: string;
+  createdAt: string;
+}
+
+export type StructuredDiffLineKind = "context" | "add" | "delete";
+
+export interface StructuredDiffLine {
+  type: StructuredDiffLineKind;
+  text: string;
+  oldLineNumber: number | null;
+  newLineNumber: number | null;
+}
+
+export interface StructuredDiffHunk {
+  header: string;
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+  lines: StructuredDiffLine[];
+}
+
+export interface StructuredFileDiff {
+  path: string;
+  status: ChangeSnapshotFileStatus;
+  additions: number;
+  deletions: number;
+  isBinary: boolean;
+  hunks: StructuredDiffHunk[];
+  diffSection: string;
+}

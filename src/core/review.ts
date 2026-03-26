@@ -6,6 +6,8 @@ import { buildReviewContext } from "./context/builder";
 import { getEnabledRules } from "./rules/engine";
 import { createProvider } from "./reviewer/providers/types";
 import { reviewCode } from "./reviewer/index";
+import { getPromptCommentContext } from "./changes/comments";
+import { getSnapshotHeadSha } from "./changes/snapshots";
 
 export interface RunReviewInput {
   taskSummary: string;
@@ -35,6 +37,8 @@ export async function runReview(
   const baseBranch = input.baseBranch ?? config.baseBranch;
   const workDir = input.workingDirectory ?? process.cwd();
   const gitResult = await getGitDiff(workDir, baseBranch);
+  const headSha = getSnapshotHeadSha(workDir);
+  const promptComments = getPromptCommentContext(deps.db, baseBranch, headSha);
   const rules = getEnabledRules(deps.db);
   const context = buildReviewContext({
     taskSummary: input.taskSummary,
@@ -54,6 +58,7 @@ export async function runReview(
     maxDiffLines: config.maxDiffLines,
     chunkSize: config.chunkSize,
     previousReviews: input.previousReviews,
+    promptComments,
   });
   saveReview(deps.db, input, baseBranch, result, gitResult.files, config);
   return result;

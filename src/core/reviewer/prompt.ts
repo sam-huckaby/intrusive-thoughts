@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import type { ReviewContext, ReviewResult, DiffChunk, ChangedFile } from "../../types";
+import type { CommentThreadWithMessages } from "../changes/comments";
 import { formatRulesForPrompt } from "../rules/engine";
 
 export interface PromptVariables {
@@ -11,6 +12,13 @@ export interface PromptVariables {
   is_chunk: string;
   chunk_info: string;
   previous_reviews: string;
+  user_comments: string;
+  orphaned_user_comments: string;
+}
+
+export interface PromptCommentOptions {
+  userComments?: CommentThreadWithMessages[];
+  orphanedUserComments?: CommentThreadWithMessages[];
 }
 
 /**
@@ -45,6 +53,7 @@ export function interpolatePrompt(
 export function buildPromptVariables(
   context: ReviewContext,
   previousReviews?: ReviewResult[],
+  commentOptions?: PromptCommentOptions,
 ): PromptVariables {
   return {
     task_summary: context.taskSummary,
@@ -55,6 +64,8 @@ export function buildPromptVariables(
     is_chunk: "false",
     chunk_info: "",
     previous_reviews: formatPreviousReviews(previousReviews),
+    user_comments: formatUserComments(commentOptions?.userComments),
+    orphaned_user_comments: formatUserComments(commentOptions?.orphanedUserComments, true),
   };
 }
 
@@ -67,6 +78,7 @@ export function buildChunkPromptVariables(
   chunkIndex: number,
   totalChunks: number,
   previousReviews?: ReviewResult[],
+  commentOptions?: PromptCommentOptions,
 ): PromptVariables {
   return {
     task_summary: context.taskSummary,
@@ -77,6 +89,8 @@ export function buildChunkPromptVariables(
     is_chunk: "true",
     chunk_info: `Reviewing chunk ${chunkIndex + 1} of ${totalChunks}`,
     previous_reviews: formatPreviousReviews(previousReviews),
+    user_comments: formatUserComments(commentOptions?.userComments),
+    orphaned_user_comments: formatUserComments(commentOptions?.orphanedUserComments, true),
   };
 }
 
@@ -128,4 +142,44 @@ function formatFileList(files: ChangedFile[]): string {
 
 function formatStats(stats: { totalAdditions: number; totalDeletions: number; filesChanged: number }): string {
   return `${stats.filesChanged} files changed, +${stats.totalAdditions} additions, -${stats.totalDeletions} deletions`;
+}
+
+export function formatUserComments(
+  threads?: CommentThreadWithMessages[],
+  orphaned = false,
+): string {
+  if (!threads || threads.length === 0) {
+    return orphaned
+      ? "No orphaned user comments exist for the current snapshot."
+      : "No active user comments exist for the current snapshot.";
+  }
+
+  return threads.map((thread, index) => {
+    const lines = [
+      `### User Comment ${index + 1}`,
+      `**Location:** ${formatThreadLocation(thread)}`,
+      `**State:** ${thread.state}`,
+    ];
+    if (thread.orphanedReason) {
+      lines.push(`**Orphaned Reason:** ${thread.orphanedReason}`);
+    }
+
+    const [root, ...replies] = thread.messages;
+    if (root) {
+      lines.push(`**Instruction:** ${root.body}`);
+    }
+    if (replies.length > 0) {
+      lines.push("**Thread:**");
+      for (const message of replies) {
+        lines.push(`- ${message.authorType}: ${message.body}`);
+      }
+    }
+    return lines.join("\n");
+  }).join("\n\n");
+}
+
+function formatThreadLocation(thread: CommentThreadWithMessages): string {
+  if (thread.anchorKind === "file") return thread.filePath;
+  if (thread.anchorKind === "line") return `${thread.filePath}:${thread.startLine}`;
+  return `${thread.filePath}:${thread.startLine}-${thread.endLine}`;
 }

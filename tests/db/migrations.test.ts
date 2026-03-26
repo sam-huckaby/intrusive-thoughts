@@ -75,7 +75,7 @@ describe("runMigrations", () => {
     const db = freshDb();
     runMigrations(db);
     const rows = db.query("SELECT version FROM schema_version ORDER BY version").all() as Array<{ version: number }>;
-    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("migration v4 adds slug and source_hash columns to rules", () => {
@@ -128,5 +128,68 @@ describe("runMigrations", () => {
     expect(() => {
       db.run("INSERT INTO rules (slug, name, description) VALUES (?, ?, ?)", ["unique-slug", "Rule 2", "Desc"]);
     }).toThrow();
+  });
+
+  it("migration v5 creates change snapshot tables", () => {
+    const db = freshDb();
+    runMigrations(db);
+    db.run(
+      "INSERT INTO change_snapshots (base_branch, head_sha, merge_base_sha, diff_hash) VALUES (?, ?, ?, ?)",
+      ["main", "head123", "base123", "diff123"],
+    );
+    const row = db.query("SELECT head_sha, merge_base_sha FROM change_snapshots WHERE head_sha = ?").get("head123") as {
+      head_sha: string;
+      merge_base_sha: string;
+    };
+    expect(row.head_sha).toBe("head123");
+    expect(row.merge_base_sha).toBe("base123");
+  });
+
+  it("migration v5 creates change_snapshot_files table", () => {
+    const db = freshDb();
+    runMigrations(db);
+    db.run(
+      "INSERT INTO change_snapshots (base_branch, head_sha, merge_base_sha, diff_hash) VALUES (?, ?, ?, ?)",
+      ["main", "head123", "base123", "diff123"],
+    );
+    const snapshot = db.query("SELECT id FROM change_snapshots WHERE head_sha = ?").get("head123") as { id: number };
+    db.run(
+      "INSERT INTO change_snapshot_files (snapshot_id, path, status, additions, deletions) VALUES (?, ?, ?, ?, ?)",
+      [snapshot.id, "src/index.ts", "modified", 5, 2],
+    );
+    const row = db.query("SELECT path, status FROM change_snapshot_files WHERE snapshot_id = ?").get(snapshot.id) as {
+      path: string;
+      status: string;
+    };
+    expect(row.path).toBe("src/index.ts");
+    expect(row.status).toBe("modified");
+  });
+
+  it("migration v5 creates threaded comment tables", () => {
+    const db = freshDb();
+    runMigrations(db);
+    db.run(
+      "INSERT INTO change_snapshots (base_branch, head_sha, merge_base_sha, diff_hash) VALUES (?, ?, ?, ?)",
+      ["main", "head123", "base123", "diff123"],
+    );
+    const snapshot = db.query("SELECT id FROM change_snapshots WHERE head_sha = ?").get("head123") as { id: number };
+    db.run(
+      "INSERT INTO comment_threads (snapshot_id, file_path, anchor_kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)",
+      [snapshot.id, "src/index.ts", "range", 10, 14],
+    );
+    const thread = db.query("SELECT id, state FROM comment_threads WHERE snapshot_id = ?").get(snapshot.id) as {
+      id: number;
+      state: string;
+    };
+    db.run(
+      "INSERT INTO comment_messages (thread_id, author_type, body) VALUES (?, ?, ?)",
+      [thread.id, "user", "Please align this with the existing API shape."],
+    );
+    const message = db.query("SELECT author_type, body FROM comment_messages WHERE thread_id = ?").get(thread.id) as {
+      author_type: string;
+      body: string;
+    };
+    expect(thread.state).toBe("open");
+    expect(message.author_type).toBe("user");
   });
 });

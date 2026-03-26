@@ -14,7 +14,7 @@ function getColumns(db: Database, table: string): Array<{ name: string; type: st
 }
 
 describe("applySchema", () => {
-  it("creates all four tables", () => {
+  it("creates all application tables", () => {
     const db = new Database(":memory:");
     applySchema(db);
     const tables = getTableNames(db);
@@ -22,6 +22,13 @@ describe("applySchema", () => {
     expect(tables).toContain("config");
     expect(tables).toContain("reviews");
     expect(tables).toContain("schema_version");
+    expect(tables).toContain("reviewer_profiles");
+    expect(tables).toContain("profile_rules");
+    expect(tables).toContain("profile_updates");
+    expect(tables).toContain("change_snapshots");
+    expect(tables).toContain("change_snapshot_files");
+    expect(tables).toContain("comment_threads");
+    expect(tables).toContain("comment_messages");
   });
 
   it("is idempotent — calling twice does not error", () => {
@@ -87,6 +94,54 @@ describe("applySchema", () => {
     expect(names).toContain("model");
     expect(names).toContain("chunks_used");
     expect(names).toContain("created_at");
+  });
+
+  it("change_snapshots table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "change_snapshots");
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "base_branch",
+      "head_sha",
+      "merge_base_sha",
+      "diff_hash",
+      "created_at",
+    ]);
+  });
+
+  it("comment_threads table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "comment_threads");
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "snapshot_id",
+      "file_path",
+      "anchor_kind",
+      "start_line",
+      "end_line",
+      "state",
+      "orphaned_reason",
+      "created_at",
+      "updated_at",
+    ]);
+  });
+
+  it("comment_messages table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "comment_messages");
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "thread_id",
+      "author_type",
+      "body",
+      "created_at",
+    ]);
   });
 
   it("rules table defaults enabled to 1", () => {

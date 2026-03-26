@@ -6,6 +6,7 @@ import {
   buildPromptVariables,
   buildChunkPromptVariables,
   formatPreviousReviews,
+  formatUserComments,
 } from "../../../src/core/reviewer/prompt";
 import type { PromptVariables } from "../../../src/core/reviewer/prompt";
 import type { ReviewContext, ReviewResult, DiffChunk } from "../../../src/types";
@@ -57,6 +58,8 @@ describe("interpolatePrompt", () => {
       is_chunk: "false",
       chunk_info: "",
       previous_reviews: "",
+      user_comments: "",
+      orphaned_user_comments: "",
     };
     const result = interpolatePrompt(template, vars);
     expect(result).toBe("Task: Test task Rules: Rule 1 Diff: +line");
@@ -73,6 +76,8 @@ describe("interpolatePrompt", () => {
       is_chunk: "false",
       chunk_info: "",
       previous_reviews: "",
+      user_comments: "",
+      orphaned_user_comments: "",
     };
     const result = interpolatePrompt(template, vars);
     expect(result).toContain("Test");
@@ -90,6 +95,8 @@ describe("interpolatePrompt", () => {
       is_chunk: "false",
       chunk_info: "",
       previous_reviews: "",
+      user_comments: "",
+      orphaned_user_comments: "",
     };
     const result = interpolatePrompt(template, vars);
     expect(result).toBe("CONTENT and also CONTENT");
@@ -132,6 +139,31 @@ describe("buildPromptVariables", () => {
   it("includes first-review message when no previous reviews", () => {
     const vars = buildPromptVariables(makeContext());
     expect(vars.previous_reviews).toContain("first review");
+  });
+
+  it("includes user comment variables", () => {
+    const vars = buildPromptVariables(makeContext(), undefined, {
+      userComments: [{
+        id: 1,
+        snapshotId: 1,
+        filePath: "src/auth.ts",
+        anchorKind: "line",
+        startLine: 12,
+        endLine: 12,
+        state: "open",
+        orphanedReason: null,
+        createdAt: "now",
+        updatedAt: "now",
+        messages: [
+          { id: 1, threadId: 1, authorType: "user", body: "This must validate null input.", createdAt: "now" },
+          { id: 2, threadId: 1, authorType: "agent", body: "Should it throw or return early?", createdAt: "now" },
+        ],
+      }],
+    });
+    expect(vars.user_comments).toContain("src/auth.ts:12");
+    expect(vars.user_comments).toContain("This must validate null input.");
+    expect(vars.user_comments).toContain("agent: Should it throw or return early?");
+    expect(vars.orphaned_user_comments).toContain("No orphaned user comments");
   });
 
   it("includes previous review context when provided", () => {
@@ -280,5 +312,33 @@ describe("formatPreviousReviews", () => {
     expect(result).toContain("src/bar.ts");
     expect(result).toContain("General concern");
     expect(result).not.toContain("src/bar.ts:");
+  });
+});
+
+describe("formatUserComments", () => {
+  it("returns empty-state text when no active comments exist", () => {
+    expect(formatUserComments(undefined)).toContain("No active user comments");
+  });
+
+  it("formats orphaned comments separately", () => {
+    const result = formatUserComments([
+      {
+        id: 1,
+        snapshotId: 1,
+        filePath: "README.md",
+        anchorKind: "range",
+        startLine: 3,
+        endLine: 5,
+        state: "orphaned",
+        orphanedReason: "Change appears reverted",
+        createdAt: "now",
+        updatedAt: "now",
+        messages: [
+          { id: 1, threadId: 1, authorType: "user", body: "Please keep this section aligned.", createdAt: "now" },
+        ],
+      },
+    ], true);
+    expect(result).toContain("README.md:3-5");
+    expect(result).toContain("Change appears reverted");
   });
 });

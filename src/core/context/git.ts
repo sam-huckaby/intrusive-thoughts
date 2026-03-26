@@ -1,4 +1,3 @@
-import simpleGit from "simple-git";
 import type { ChangedFile, DiffStats } from "../../types";
 import { GitError } from "../../types";
 
@@ -31,8 +30,17 @@ export async function getGitDiff(
 
 async function fetchRawDiff(dir: string, base: string): Promise<string> {
   try {
-    const git = simpleGit(dir);
-    return await git.diff([`${base}...HEAD`]);
+    const proc = Bun.spawnSync({
+      cmd: ["git", "diff", `${base}...HEAD`],
+      cwd: dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (proc.exitCode !== 0) {
+      const stderr = new TextDecoder().decode(proc.stderr).trim();
+      throw new Error(stderr || `git exited with code ${proc.exitCode}`);
+    }
+    return new TextDecoder().decode(proc.stdout);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new GitError(`Git diff failed: ${msg}`, `git diff ${base}...HEAD`);
