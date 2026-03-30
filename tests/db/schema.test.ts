@@ -29,6 +29,9 @@ describe("applySchema", () => {
     expect(tables).toContain("change_snapshot_files");
     expect(tables).toContain("comment_threads");
     expect(tables).toContain("comment_messages");
+    expect(tables).toContain("eval_fixtures");
+    expect(tables).toContain("eval_expected_findings");
+    expect(tables).toContain("eval_runs");
   });
 
   it("is idempotent — calling twice does not error", () => {
@@ -140,6 +143,60 @@ describe("applySchema", () => {
       "thread_id",
       "author_type",
       "body",
+      "created_at",
+    ]);
+  });
+
+  it("eval_fixtures table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "eval_fixtures");
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "name",
+      "file_name",
+      "language",
+      "code",
+      "notes",
+      "created_at",
+      "updated_at",
+    ]);
+  });
+
+  it("eval_expected_findings table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "eval_expected_findings");
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "fixture_id",
+      "title",
+      "description",
+      "severity",
+      "line_hint",
+      "required",
+      "tags_json",
+      "created_at",
+      "updated_at",
+    ]);
+  });
+
+  it("eval_runs table has correct columns", () => {
+    const db = new Database(":memory:");
+    applySchema(db);
+    const cols = getColumns(db, "eval_runs");
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "fixture_ids_json",
+      "reviewer_slugs_json",
+      "reviewer_reports_json",
+      "merged_report_json",
+      "judge_result_json",
+      "judge_provider",
+      "judge_model",
       "created_at",
     ]);
   });

@@ -21,6 +21,8 @@ describe("runMigrations", () => {
     expect(map.get("maxDiffLines")).toBe("5000");
     expect(map.get("chunkSize")).toBe("10");
     expect(map.get("httpPort")).toBe("3456");
+    expect(map.get("evalProvider")).toBe("anthropic");
+    expect(map.get("evalModel")).toBe("claude-sonnet-4-20250514");
   });
 
   it("is idempotent — running twice does not duplicate config", () => {
@@ -75,7 +77,7 @@ describe("runMigrations", () => {
     const db = freshDb();
     runMigrations(db);
     const rows = db.query("SELECT version FROM schema_version ORDER BY version").all() as Array<{ version: number }>;
-    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4, 5]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it("migration v4 adds slug and source_hash columns to rules", () => {
@@ -191,5 +193,45 @@ describe("runMigrations", () => {
     };
     expect(thread.state).toBe("open");
     expect(message.author_type).toBe("user");
+  });
+
+  it("migration v6 seeds eval judge config keys", () => {
+    const db = freshDb();
+    runMigrations(db);
+    const provider = db.query("SELECT value FROM config WHERE key = 'evalProvider'").get() as { value: string } | null;
+    const model = db.query("SELECT value FROM config WHERE key = 'evalModel'").get() as { value: string } | null;
+    expect(provider).not.toBeNull();
+    expect(model).not.toBeNull();
+    expect(provider!.value).toBe("anthropic");
+    expect(model!.value).toBe("claude-sonnet-4-20250514");
+  });
+
+  it("migration v6 creates eval tables", () => {
+    const db = freshDb();
+    runMigrations(db);
+    db.run(
+      "INSERT INTO eval_fixtures (name, file_name, language, code, notes) VALUES (?, ?, ?, ?, ?)",
+      ["Unsafe fetch", "src/api.ts", "ts", "fetch(url)", "fixture notes"],
+    );
+    const fixture = db.query("SELECT id FROM eval_fixtures WHERE name = ?").get("Unsafe fetch") as { id: number };
+    db.run(
+      "INSERT INTO eval_expected_findings (fixture_id, title, description, severity, line_hint, required, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [fixture.id, "Missing error handling", "Promise result is not handled safely.", "critical", "1", 1, '["async"]'],
+    );
+    db.run(
+      "INSERT INTO eval_runs (fixture_ids_json, reviewer_slugs_json, reviewer_reports_json, merged_report_json, judge_result_json, judge_provider, judge_model) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ['[1]', '["general"]', '[]', '{"comments":[]}', '{"score":0.9}', "anthropic", "claude-sonnet-4-20250514"],
+    );
+    const finding = db.query("SELECT title, severity FROM eval_expected_findings WHERE fixture_id = ?").get(fixture.id) as {
+      title: string;
+      severity: string;
+    };
+    const run = db.query("SELECT judge_provider, judge_model FROM eval_runs LIMIT 1").get() as {
+      judge_provider: string;
+      judge_model: string;
+    };
+    expect(finding.title).toBe("Missing error handling");
+    expect(finding.severity).toBe("critical");
+    expect(run.judge_provider).toBe("anthropic");
   });
 });

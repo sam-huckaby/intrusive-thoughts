@@ -26,6 +26,8 @@ describe("GET /api/config", () => {
     expect(res.body.chunkSize).toBe("10");
     expect(res.body.httpPort).toBe("3456");
     expect(res.body.maxReviewRounds).toBe("5");
+    expect(res.body.evalProvider).toBe("anthropic");
+    expect(res.body.evalModel).toBe("claude-sonnet-4-20250514");
   });
 });
 
@@ -64,5 +66,13 @@ describe("PUT /api/config", () => {
     await request.put("/api/config").send({ model: "gpt-4o" });
     const res = await request.get("/api/config");
     expect(res.body.maxReviewRounds).toBe("5");
+  });
+
+  it("updates eval judge config values", async () => {
+    const res = await request
+      .put("/api/config")
+      .send({ evalProvider: "openai", evalModel: "gpt-5-mini" });
+    expect(res.body.evalProvider).toBe("openai");
+    expect(res.body.evalModel).toBe("gpt-5-mini");
   });
 });

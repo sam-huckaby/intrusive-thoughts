@@ -7,6 +7,9 @@ import { ReviewDetail } from "./components/ReviewDetail";
 import { ReviewersPage } from "./components/ReviewersPage";
 import { ProfileEditor } from "./components/ProfileEditor";
 import { ChangesPage } from "./components/ChangesPage";
+import { EvalsPage } from "./components/EvalsPage";
+import { EvalFixtureEditor } from "./components/EvalFixtureEditor";
+import { EvalRunDetail } from "./components/EvalRunDetail";
 
 export function App() {
   return (
@@ -20,6 +23,9 @@ export function App() {
           <Route path="/prompt" element={<Navigate to="/reviewers" replace />} />
           <Route path="/reviewers" element={<ReviewersPage />} />
           <Route path="/reviewers/:id" element={<ProfileEditor />} />
+          <Route path="/evals" element={<EvalsPage />} />
+          <Route path="/evals/:id" element={<EvalFixtureEditor />} />
+          <Route path="/evals/runs/:id" element={<EvalRunDetail />} />
           <Route path="/reviews" element={<ReviewHistory />} />
           <Route path="/reviews/:id" element={<ReviewDetail />} />
         </Route>

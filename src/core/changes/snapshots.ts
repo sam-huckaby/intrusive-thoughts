@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
-import type { AppConfig, ChangeSnapshot } from "../../types";
+import type { ChangeSnapshot } from "../../types";
 import { ConfigError } from "../../types";
+import { loadAppConfig } from "../config";
 import { getGitDiff } from "../context/git";
 import type { RepoContext } from "../context/repo";
 import { reconcileOpenThreadsAgainstSnapshot } from "./comments";
@@ -35,7 +36,7 @@ async function ensureSnapshotState(
   db: Database,
   repoContext: RepoContext,
 ): Promise<SnapshotState> {
-  const config = loadConfig(db);
+  const config = loadAppConfig(db);
   const headSha = await getHeadSha(repoContext.root);
   const existing = getSnapshotByHead(db, config.baseBranch, headSha);
   if (existing) {
@@ -66,21 +67,6 @@ async function ensureSnapshotState(
     headSha,
     snapshot,
     created: true,
-  };
-}
-
-function loadConfig(db: Database): AppConfig {
-  const rows = db.query("SELECT key, value FROM config").all() as Array<{ key: string; value: string }>;
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  return {
-    provider: (map.get("provider") ?? "anthropic") as AppConfig["provider"],
-    model: map.get("model") ?? "claude-sonnet-4-20250514",
-    baseBranch: map.get("baseBranch") ?? "main",
-    maxDiffLines: Number(map.get("maxDiffLines") ?? "5000"),
-    chunkSize: Number(map.get("chunkSize") ?? "10"),
-    httpPort: Number(map.get("httpPort") ?? "3456"),
-    maxReviewRounds: Number(map.get("maxReviewRounds") ?? "5"),
-    fallbackProfile: map.get("fallbackProfile") ?? "general",
   };
 }
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
+import { readConfigEntries } from "../core/config";
 
 const UpdateConfigSchema = z.record(z.string(), z.string());
 
@@ -15,9 +16,7 @@ function handleGetConfig(
   db: Database,
   res: { json: (body: unknown) => void },
 ): void {
-  const rows = db.query("SELECT key, value FROM config").all() as Array<{ key: string; value: string }>;
-  const config = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-  res.json(config);
+  res.json(readConfigEntries(db));
 }
 
 function handleUpdateConfig(

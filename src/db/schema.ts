@@ -93,6 +93,39 @@ const TABLES = [
     body        TEXT NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS eval_fixtures (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    file_name  TEXT NOT NULL,
+    language   TEXT NOT NULL DEFAULT '',
+    code       TEXT NOT NULL,
+    notes      TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS eval_expected_findings (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    fixture_id  INTEGER NOT NULL REFERENCES eval_fixtures(id) ON DELETE CASCADE,
+    title       TEXT NOT NULL,
+    description TEXT NOT NULL,
+    severity    TEXT NOT NULL DEFAULT 'warning',
+    line_hint   TEXT NOT NULL DEFAULT '',
+    required    INTEGER NOT NULL DEFAULT 1,
+    tags_json   TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS eval_runs (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    fixture_ids_json      TEXT NOT NULL,
+    reviewer_slugs_json   TEXT NOT NULL,
+    reviewer_reports_json TEXT NOT NULL,
+    merged_report_json    TEXT NOT NULL,
+    judge_result_json     TEXT NOT NULL,
+    judge_provider        TEXT NOT NULL,
+    judge_model           TEXT NOT NULL,
+    created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 /**

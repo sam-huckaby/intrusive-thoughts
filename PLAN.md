@@ -12,12 +12,14 @@ directory such as `PLANS/IT-001/`. New plans should generally be created from
 1. `PLANS/IT-001/HUMAN_REVIEW_PLAN.md` - Human review workspace, snapshot-backed
    repository browser, authoritative user comments, threaded agent replies, and
    reviewer prompt integration via `{{user_comments}}` and `{{orphaned_user_comments}}`.
+2. `PLANS/IT-002/EVAL_FIXTURES_PLAN.md` - Eval fixture library, synthetic snippet
+   review mode, merged multi-reviewer outputs, and LLM judge scoring for prompt regression testing.
 
 ## Current Working Plan
 
 The current feature plan being worked on is:
 
-- `PLANS/IT-001/HUMAN_REVIEW_PLAN.md`
+- `PLANS/IT-002/EVAL_FIXTURES_PLAN.md`
 
 ## Plan Frontmatter Schema
 

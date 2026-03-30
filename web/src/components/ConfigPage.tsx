@@ -57,6 +57,29 @@ export function ConfigPage() {
               placeholder="e.g. claude-sonnet-4-20250514"
             />
           </FormField>
+          <div className="rounded-md border border-stone-200 bg-stone-50/50 p-4">
+            <h3 className="text-sm font-semibold text-stone-700">Eval Judge</h3>
+            <p className="mt-1 text-xs text-stone-400">
+              Separate provider and model used to score eval runs against expected findings.
+            </p>
+            <div className="mt-4 space-y-4">
+              <FormField label="Eval Provider">
+                <Select
+                  value={form.evalProvider ?? ""}
+                  onValueChange={(v) => setForm({ ...form, evalProvider: v })}
+                  options={PROVIDERS}
+                />
+              </FormField>
+              <FormField label="Eval Model">
+                <input
+                  type="text"
+                  value={form.evalModel ?? ""}
+                  onChange={(e) => setForm({ ...form, evalModel: e.target.value })}
+                  placeholder="e.g. claude-sonnet-4-20250514"
+                />
+              </FormField>
+            </div>
+          </div>
           <FormField label="Base Branch">
             <input
               type="text"
