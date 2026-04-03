@@ -157,6 +157,7 @@ describe("applySchema", () => {
       "name",
       "file_name",
       "language",
+      "category",
       "code",
       "notes",
       "created_at",

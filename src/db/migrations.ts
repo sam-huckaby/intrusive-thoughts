@@ -141,6 +141,16 @@ const MIGRATIONS: Migration[] = [
       `INSERT OR IGNORE INTO config (key, value) VALUES ('evalModel', 'claude-sonnet-4-20250514')`,
     ],
   },
+  {
+    version: 7,
+    description: "Add category column to eval fixtures",
+    up: (db: Database) => {
+      const columns = db.query("PRAGMA table_info(eval_fixtures)").all() as Array<{ name: string }>;
+      if (!columns.some((c) => c.name === "category")) {
+        db.run("ALTER TABLE eval_fixtures ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+      }
+    },
+  },
 ];
 
 function getAppliedVersions(db: Database): Set<number> {

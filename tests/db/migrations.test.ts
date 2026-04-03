@@ -77,7 +77,7 @@ describe("runMigrations", () => {
     const db = freshDb();
     runMigrations(db);
     const rows = db.query("SELECT version FROM schema_version ORDER BY version").all() as Array<{ version: number }>;
-    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   it("migration v4 adds slug and source_hash columns to rules", () => {

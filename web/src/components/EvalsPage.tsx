@@ -17,6 +17,7 @@ interface EvalFixture {
   name: string;
   fileName: string;
   language: string;
+  category: string;
   notes: string;
   findings: EvalFinding[];
 }
@@ -199,7 +200,7 @@ function FixturesSection({ fixtures, onOpen }: { fixtures: EvalFixture[]; onOpen
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h4 className="text-sm font-semibold text-stone-800">{fixture.name}</h4>
-                    <p className="mt-1 text-xs text-stone-400">{fixture.fileName}{fixture.language ? ` • ${fixture.language}` : ""}</p>
+                    <p className="mt-1 text-xs text-stone-400">{fixture.fileName}{fixture.language ? ` • ${fixture.language}` : ""}{fixture.category ? ` • ${fixture.category}` : ""}</p>
                   </div>
                   <span className="text-xs text-stone-400">{fixture.findings.length} findings</span>
                 </div>

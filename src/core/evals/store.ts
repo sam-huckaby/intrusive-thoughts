@@ -13,6 +13,7 @@ export interface EvalFixtureInput {
   name: string;
   fileName: string;
   language: string;
+  category: string;
   code: string;
   notes: string;
   findings: Array<{
@@ -27,7 +28,7 @@ export interface EvalFixtureInput {
 
 export function listEvalFixtures(db: Database): EvalFixtureWithFindings[] {
   const fixtures = db.query(
-    `SELECT id, name, file_name, language, code, notes, created_at, updated_at
+    `SELECT id, name, file_name, language, category, code, notes, created_at, updated_at
      FROM eval_fixtures
      ORDER BY id DESC`,
   ).all() as EvalFixtureRow[];
@@ -39,7 +40,7 @@ export function listEvalFixtures(db: Database): EvalFixtureWithFindings[] {
 
 export function getEvalFixture(db: Database, id: number): EvalFixtureWithFindings | null {
   const row = db.query(
-    `SELECT id, name, file_name, language, code, notes, created_at, updated_at
+    `SELECT id, name, file_name, language, category, code, notes, created_at, updated_at
      FROM eval_fixtures WHERE id = ?`,
   ).get(id) as EvalFixtureRow | null;
   if (!row) return null;
@@ -55,9 +56,9 @@ export function getEvalFixturesByIds(db: Database, ids: number[]): EvalFixtureWi
 
 export function createEvalFixture(db: Database, input: EvalFixtureInput): EvalFixtureWithFindings {
   const result = db.run(
-    `INSERT INTO eval_fixtures (name, file_name, language, code, notes)
-     VALUES (?, ?, ?, ?, ?)`,
-    [input.name, input.fileName, input.language, input.code, input.notes],
+    `INSERT INTO eval_fixtures (name, file_name, language, category, code, notes)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [input.name, input.fileName, input.language, input.category, input.code, input.notes],
   );
   const fixtureId = Number(result.lastInsertRowid);
   replaceFindings(db, fixtureId, input.findings);
@@ -69,9 +70,9 @@ export function updateEvalFixture(db: Database, id: number, input: EvalFixtureIn
   if (!existing) return null;
   db.run(
     `UPDATE eval_fixtures
-     SET name = ?, file_name = ?, language = ?, code = ?, notes = ?, updated_at = datetime('now')
+     SET name = ?, file_name = ?, language = ?, category = ?, code = ?, notes = ?, updated_at = datetime('now')
      WHERE id = ?`,
-    [input.name, input.fileName, input.language, input.code, input.notes, id],
+    [input.name, input.fileName, input.language, input.category, input.code, input.notes, id],
   );
   db.run("DELETE FROM eval_expected_findings WHERE fixture_id = ?", [id]);
   replaceFindings(db, id, input.findings);
@@ -171,6 +172,7 @@ function rowToFixture(row: EvalFixtureRow): EvalFixture {
     name: row.name,
     fileName: row.file_name,
     language: row.language,
+    category: row.category,
     code: row.code,
     notes: row.notes,
     createdAt: row.created_at,
@@ -212,6 +214,7 @@ interface EvalFixtureRow {
   name: string;
   file_name: string;
   language: string;
+  category: string;
   code: string;
   notes: string;
   created_at: string;

@@ -98,6 +98,7 @@ const TABLES = [
     name       TEXT NOT NULL,
     file_name  TEXT NOT NULL,
     language   TEXT NOT NULL DEFAULT '',
+    category   TEXT NOT NULL DEFAULT '',
     code       TEXT NOT NULL,
     notes      TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),

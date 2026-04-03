@@ -25,6 +25,7 @@ const FixtureSchema = z.object({
   name: z.string().min(1),
   fileName: z.string().min(1),
   language: z.string().default(""),
+  category: z.string().default(""),
   code: z.string().min(1),
   notes: z.string().default(""),
   findings: z.array(FindingSchema),

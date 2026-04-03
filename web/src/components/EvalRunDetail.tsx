@@ -1,8 +1,22 @@
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApi } from "../hooks/useApi";
 import { Button } from "./ui/Button";
 import { Card, CardBody, CardHeader } from "./ui/Card";
 import { SeverityBadge, VerdictBadge, Badge } from "./ui/Badge";
+
+interface EvalFinding {
+  id: number;
+  title: string;
+  severity: "critical" | "warning" | "suggestion";
+  required: boolean;
+}
+
+interface EvalFixture {
+  id: number;
+  name: string;
+  findings: EvalFinding[];
+}
 
 interface EvalRun {
   id: number;
@@ -47,6 +61,20 @@ export function EvalRunDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { data: run, loading } = useApi<EvalRun>(`/api/evals/runs/${id}`);
+  const { data: fixtures } = useApi<EvalFixture[]>("/api/evals/fixtures");
+
+  const findingLookup = useMemo(() => {
+    const map = new Map<number, EvalFinding>();
+    if (!fixtures || !run) return map;
+    for (const fixture of fixtures) {
+      if (run.fixtureIds.includes(fixture.id)) {
+        for (const finding of fixture.findings) {
+          map.set(finding.id, finding);
+        }
+      }
+    }
+    return map;
+  }, [fixtures, run]);
 
   if (loading) return <LoadingState />;
   if (!run) return <NotFoundState />;
@@ -73,9 +101,73 @@ export function EvalRunDetail() {
             <VerdictBadge verdict={run.mergedReport.verdict} />
           </div>
           <p className="text-sm text-stone-600">{run.judgeResult.summary}</p>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FindingList title="Expected Findings" items={run.judgeResult.findings.map((finding) => `${finding.status}: ${finding.rationale}`)} />
-            <FindingList title="Extras" items={run.judgeResult.extras.map((extra) => `Comment ${extra.commentIndex}: ${extra.rationale}`)} empty="No extras scored." />
+
+          <div>
+            <h4 className="mb-2 text-sm font-medium text-stone-700">Expected Findings</h4>
+            <div className="space-y-2">
+              {run.judgeResult.findings.map((finding) => {
+                const meta = findingLookup.get(finding.findingId);
+                return (
+                  <div
+                    key={finding.findingId}
+                    className={`rounded-md border p-3 ${
+                      finding.status === "matched"
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : finding.status === "partial"
+                        ? "border-amber-200 bg-amber-50/50"
+                        : "border-red-200 bg-red-50/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold uppercase ${
+                        finding.status === "matched"
+                          ? "text-emerald-700"
+                          : finding.status === "partial"
+                          ? "text-amber-700"
+                          : "text-red-700"
+                      }`}>
+                        {finding.status === "matched" ? "Caught" : finding.status === "partial" ? "Partial" : "Missed"}
+                      </span>
+                      <span className="text-sm italic text-stone-700">
+                        {meta?.title ?? `Finding #${finding.findingId}`}
+                      </span>
+                      {meta && <SeverityBadge severity={meta.severity} />}
+                    </div>
+                    <p className="mt-1 text-xs text-stone-500">{finding.rationale}</p>
+                  </div>
+                );
+              })}
+              {run.judgeResult.findings.length === 0 && (
+                <p className="text-sm text-stone-400">No expected findings.</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="mb-2 text-sm font-medium text-stone-700">Extras</h4>
+            <div className="space-y-2">
+              {run.judgeResult.extras.map((extra, index) => {
+                const comment = run.mergedReport.comments[extra.commentIndex];
+                return (
+                  <div key={index} className="rounded-md border border-stone-200 bg-stone-50/50 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase text-stone-400">Extra</span>
+                      {comment && <SeverityBadge severity={comment.severity} />}
+                      {comment && (
+                        <code className="text-xs text-stone-400">
+                          {comment.file}{comment.line ? `:${comment.line}` : ""}
+                        </code>
+                      )}
+                    </div>
+                    {comment && <p className="mt-1 text-sm italic text-stone-500">{comment.comment}</p>}
+                    <p className="mt-1 text-xs text-stone-400">{extra.rationale}</p>
+                  </div>
+                );
+              })}
+              {run.judgeResult.extras.length === 0 && (
+                <p className="text-sm text-stone-400">No extras scored.</p>
+              )}
+            </div>
           </div>
         </CardBody>
       </Card>
@@ -130,18 +222,6 @@ export function EvalRunDetail() {
   );
 }
 
-function FindingList({ title, items, empty = "No entries." }: { title: string; items: string[]; empty?: string }) {
-  return (
-    <div>
-      <h4 className="mb-2 text-sm font-medium text-stone-700">{title}</h4>
-      {items.length === 0 ? <p className="text-sm text-stone-400">{empty}</p> : (
-        <ul className="space-y-2">
-          {items.map((item, index) => <li key={index} className="text-sm text-stone-600">{item}</li>)}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 function LoadingState() {
   return <div className="text-sm text-stone-400">Loading eval run...</div>;

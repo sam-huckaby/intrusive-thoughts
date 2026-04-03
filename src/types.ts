@@ -173,6 +173,7 @@ export interface EvalFixture {
   name: string;
   fileName: string;
   language: string;
+  category: string;
   code: string;
   notes: string;
   createdAt: string;

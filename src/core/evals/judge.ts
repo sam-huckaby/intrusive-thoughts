@@ -60,7 +60,19 @@ function buildJudgeUserMessage(
         {
           findingId: 1,
           status: "matched",
-          rationale: "Why the finding matched, partially matched, or was missed.",
+          rationale: "Why the finding matched.",
+          matchedCommentIndexes: [0],
+        },
+        {
+          findingId: 2,
+          status: "partial",
+          rationale: "Why the finding partially matched.",
+          matchedCommentIndexes: [0],
+        },
+        {
+          findingId: 3,
+          status: "missed",
+          rationale: "Why the finding was missed.",
           matchedCommentIndexes: [0],
         },
       ],
@@ -97,10 +109,7 @@ function validateJudgeResult(parsed: unknown): EvalJudgeResult {
 
 function validateJudgeFinding(value: unknown): EvalJudgeResult["findings"][number] {
   if (!isObject(value)) throw new ParseError("Eval judge finding entry is not an object");
-  const status = value.status;
-  if (status !== "matched" && status !== "partial" && status !== "missed") {
-    throw new ParseError("Eval judge finding entry has invalid status");
-  }
+  const status = normalizeStatus(value.status);
   return {
     findingId: typeof value.findingId === "number" ? value.findingId : 0,
     status,
@@ -109,6 +118,14 @@ function validateJudgeFinding(value: unknown): EvalJudgeResult["findings"][numbe
       ? value.matchedCommentIndexes.filter((item): item is number => typeof item === "number")
       : [],
   };
+}
+
+function normalizeStatus(value: unknown): "matched" | "partial" | "missed" {
+  if (typeof value !== "string") return "missed";
+  const lower = value.toLowerCase().trim();
+  if (lower === "matched" || lower === "found" || lower === "detected") return "matched";
+  if (lower === "partial" || lower === "partially_matched") return "partial";
+  return "missed";
 }
 
 function validateJudgeExtra(value: unknown): EvalJudgeResult["extras"][number] {

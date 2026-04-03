@@ -22,6 +22,7 @@ interface FixtureResponse {
   name: string;
   fileName: string;
   language: string;
+  category: string;
   code: string;
   notes: string;
   findings: FindingForm[];
@@ -45,6 +46,7 @@ export function EvalFixtureEditor() {
     name: "",
     fileName: "",
     language: "",
+    category: "",
     code: "",
     notes: "",
     findings: [{ ...EMPTY_FINDING }],
@@ -85,6 +87,7 @@ export function EvalFixtureEditor() {
       name: form.name,
       fileName: form.fileName,
       language: form.language,
+      category: form.category,
       code: form.code,
       notes: form.notes,
       findings: form.findings,
@@ -125,12 +128,13 @@ export function EvalFixtureEditor() {
         <CardHeader><h3 className="text-sm font-semibold text-stone-700">Fixture Details</h3></CardHeader>
         <CardBody className="space-y-4">
           <FormField label="Name"><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></FormField>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="Filename"><input type="text" value={form.fileName} onChange={(e) => setForm({ ...form, fileName: e.target.value })} /></FormField>
+          <div className="grid gap-4 md:grid-cols-3">
+            <FormField label="Filename (reviewer sees this)"><input type="text" value={form.fileName} onChange={(e) => setForm({ ...form, fileName: e.target.value })} /></FormField>
             <FormField label="Language"><input type="text" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} placeholder="ts,tsx,js,py..." /></FormField>
+            <FormField label="Category"><input type="text" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="security, design, performance..." /></FormField>
           </div>
-          <FormField label="Notes"><textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></FormField>
-          <FormField label="Code"><textarea rows={16} className="font-mono text-xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></FormField>
+          <FormField label="Notes"><textarea rows={3} className="w-full" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></FormField>
+          <FormField label="Code"><textarea rows={16} className="w-full font-mono text-xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></FormField>
         </CardBody>
       </Card>
 
@@ -151,8 +155,8 @@ export function EvalFixtureEditor() {
                 )}
               </div>
               <div className="space-y-4">
-                <FormField label="Title"><input type="text" value={finding.title} onChange={(e) => updateFinding(form, setForm, index, { title: e.target.value })} /></FormField>
-                <FormField label="Description"><textarea rows={3} value={finding.description} onChange={(e) => updateFinding(form, setForm, index, { description: e.target.value })} /></FormField>
+                <FormField label="Title"><input type="text" value={finding.title} className="w-full" onChange={(e) => updateFinding(form, setForm, index, { title: e.target.value })} /></FormField>
+                <FormField label="Description"><textarea rows={3} value={finding.description} className="w-full" onChange={(e) => updateFinding(form, setForm, index, { description: e.target.value })} /></FormField>
                 <div className="grid gap-4 md:grid-cols-3">
                   <FormField label="Severity">
                     <Select
@@ -165,8 +169,8 @@ export function EvalFixtureEditor() {
                       ]}
                     />
                   </FormField>
-                  <FormField label="Line Hint"><input type="text" value={finding.lineHint} onChange={(e) => updateFinding(form, setForm, index, { lineHint: e.target.value })} /></FormField>
-                  <FormField label="Tags (comma-separated)"><input type="text" value={finding.tags.join(", ")} onChange={(e) => updateFinding(form, setForm, index, { tags: e.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} /></FormField>
+                  <FormField label="Line Hint"><input type="text" value={finding.lineHint} className="w-full" onChange={(e) => updateFinding(form, setForm, index, { lineHint: e.target.value })} /></FormField>
+                  <FormField label="Tags (comma-separated)"><input type="text" value={finding.tags.join(", ")} className="w-full" onChange={(e) => updateFinding(form, setForm, index, { tags: e.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} /></FormField>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-stone-600">
                   <input type="checkbox" checked={finding.required} onChange={(e) => updateFinding(form, setForm, index, { required: e.target.checked })} />
