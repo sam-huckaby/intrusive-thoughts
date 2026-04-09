@@ -6,6 +6,7 @@ import { createPromptRouter } from "./prompt";
 import { createReviewsRouter } from "./reviews";
 import { createProfilesRouter } from "./profiles";
 import { createChangesRouter } from "./changes";
+import { createEvalsRouter } from "./evals";
 import type { RepoContext } from "../core/context/repo";
 
 /**
@@ -25,4 +26,5 @@ export function mountRoutes(
   app.use("/api/reviews", createReviewsRouter(db, promptPath));
   app.use("/api/profiles", createProfilesRouter(db));
   app.use("/api/changes", createChangesRouter(db, repoContext));
+  app.use("/api/evals", createEvalsRouter(db));
 }

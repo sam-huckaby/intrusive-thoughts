@@ -156,12 +156,109 @@ export interface MultiReviewResult {
 export interface AppConfig {
   provider: "anthropic" | "openai";
   model: string;
+  evalProvider: "anthropic" | "openai";
+  evalModel: string;
   baseBranch: string;
   maxDiffLines: number;
   chunkSize: number;
   httpPort: number;
   maxReviewRounds: number;
   fallbackProfile: string;
+}
+
+export type EvalFindingSeverity = "critical" | "warning" | "suggestion";
+
+export interface EvalFixture {
+  id: number;
+  name: string;
+  fileName: string;
+  language: string;
+  category: string;
+  code: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalExpectedFinding {
+  id: number;
+  fixtureId: number;
+  title: string;
+  description: string;
+  severity: EvalFindingSeverity;
+  lineHint: string;
+  required: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalFixtureWithFindings extends EvalFixture {
+  findings: EvalExpectedFinding[];
+}
+
+export interface EvalReviewerReport {
+  reviewerSlug: string;
+  reviewerName: string;
+  report: ReviewResult;
+}
+
+export interface EvalMergedFindingSource {
+  reviewerSlug: string;
+  reviewerName: string;
+  originalIndex: number;
+}
+
+export interface EvalMergedComment {
+  file: string;
+  line?: number;
+  severity: FileComment["severity"];
+  comment: string;
+  sources: EvalMergedFindingSource[];
+}
+
+export interface EvalMergedSuggestion {
+  text: string;
+  sources: EvalMergedFindingSource[];
+}
+
+export interface EvalMergedReport {
+  verdict: ReviewResult["verdict"];
+  summary: string;
+  comments: EvalMergedComment[];
+  suggestions: EvalMergedSuggestion[];
+  confidence: number;
+}
+
+export interface EvalJudgeFindingResult {
+  findingId: number;
+  status: "matched" | "partial" | "missed";
+  rationale: string;
+  matchedCommentIndexes: number[];
+}
+
+export interface EvalJudgeExtraFinding {
+  commentIndex: number;
+  rationale: string;
+}
+
+export interface EvalJudgeResult {
+  score: number;
+  summary: string;
+  findings: EvalJudgeFindingResult[];
+  extras: EvalJudgeExtraFinding[];
+}
+
+export interface EvalRun {
+  id: number;
+  fixtureIds: number[];
+  reviewerSlugs: string[];
+  reviewerReports: EvalReviewerReport[];
+  mergedReport: EvalMergedReport;
+  judgeResult: EvalJudgeResult;
+  judgeProvider: AppConfig["evalProvider"];
+  judgeModel: string;
+  createdAt: string;
 }
 
 // ─── Human Review Workspace ──────────────────────────────

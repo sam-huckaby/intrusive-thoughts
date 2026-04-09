@@ -7,6 +7,7 @@ import type {
   MultiReviewResult,
 } from "../types";
 import { ConfigError } from "../types";
+import { loadAppConfig } from "./config";
 import { getGitDiff } from "./context/git";
 import { buildReviewContext } from "./context/builder";
 import { createProvider } from "./reviewer/providers/types";
@@ -53,7 +54,7 @@ export async function runMultiReview(
   input: MultiReviewInput,
   deps: MultiReviewDeps,
 ): Promise<MultiReviewResult> {
-  const config = loadConfig(deps.db);
+  const config = loadAppConfig(deps.db);
   const baseBranch = input.baseBranch ?? config.baseBranch;
   const workDir = input.workingDirectory ?? process.cwd();
 
@@ -178,24 +179,6 @@ function resolveProfiles(
 }
 
 // ─── Config & helpers ────────────────────────────────────
-
-function loadConfig(db: Database): AppConfig {
-  const rows = db.query("SELECT key, value FROM config").all() as Array<{
-    key: string;
-    value: string;
-  }>;
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  return {
-    provider: (map.get("provider") ?? "anthropic") as AppConfig["provider"],
-    model: map.get("model") ?? "claude-sonnet-4-20250514",
-    baseBranch: map.get("baseBranch") ?? "main",
-    maxDiffLines: Number(map.get("maxDiffLines") ?? "5000"),
-    chunkSize: Number(map.get("chunkSize") ?? "10"),
-    httpPort: Number(map.get("httpPort") ?? "3456"),
-    maxReviewRounds: Number(map.get("maxReviewRounds") ?? "5"),
-    fallbackProfile: map.get("fallbackProfile") ?? "general",
-  };
-}
 
 function resolveApiKey(provider: string): string {
   const envKey =

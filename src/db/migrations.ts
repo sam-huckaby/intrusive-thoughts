@@ -100,6 +100,57 @@ const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 6,
+    description: "Add eval fixtures tables and judge config defaults",
+    up: [
+      `CREATE TABLE IF NOT EXISTS eval_fixtures (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL,
+        file_name  TEXT NOT NULL,
+        language   TEXT NOT NULL DEFAULT '',
+        code       TEXT NOT NULL,
+        notes      TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS eval_expected_findings (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        fixture_id  INTEGER NOT NULL REFERENCES eval_fixtures(id) ON DELETE CASCADE,
+        title       TEXT NOT NULL,
+        description TEXT NOT NULL,
+        severity    TEXT NOT NULL DEFAULT 'warning',
+        line_hint   TEXT NOT NULL DEFAULT '',
+        required    INTEGER NOT NULL DEFAULT 1,
+        tags_json   TEXT NOT NULL DEFAULT '[]',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS eval_runs (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        fixture_ids_json      TEXT NOT NULL,
+        reviewer_slugs_json   TEXT NOT NULL,
+        reviewer_reports_json TEXT NOT NULL,
+        merged_report_json    TEXT NOT NULL,
+        judge_result_json     TEXT NOT NULL,
+        judge_provider        TEXT NOT NULL,
+        judge_model           TEXT NOT NULL,
+        created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `INSERT OR IGNORE INTO config (key, value) VALUES ('evalProvider', 'anthropic')`,
+      `INSERT OR IGNORE INTO config (key, value) VALUES ('evalModel', 'claude-sonnet-4-20250514')`,
+    ],
+  },
+  {
+    version: 7,
+    description: "Add category column to eval fixtures",
+    up: (db: Database) => {
+      const columns = db.query("PRAGMA table_info(eval_fixtures)").all() as Array<{ name: string }>;
+      if (!columns.some((c) => c.name === "category")) {
+        db.run("ALTER TABLE eval_fixtures ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+      }
+    },
+  },
 ];
 
 function getAppliedVersions(db: Database): Set<number> {

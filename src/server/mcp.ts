@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { Database } from "bun:sqlite";
 import type {
+  AppConfig,
   ReviewerProfile,
   ProfileReviewResult,
   AcceptedProfile,
@@ -24,6 +25,7 @@ import {
   hashDiff,
 } from "./session";
 import type { SessionMetadata } from "./session";
+import { loadAppConfig } from "../core/config";
 
 export interface McpServerOptions {
   db: Database;
@@ -135,7 +137,7 @@ async function handleReviewTool(
     });
   }
 
-  const config = loadConfig(options.db);
+  const config = loadAppConfig(options.db);
   const resolvedBaseBranch = baseBranch ?? config.baseBranch;
   const workDir = workingDirectory ?? process.cwd();
 
@@ -322,35 +324,6 @@ function buildAcceptedList(session: ReviewSession): AcceptedProfile[] {
     profileName: a.slug,
     acceptedAtRound: a.acceptedAtRound,
   }));
-}
-
-interface AppConfig {
-  provider: "anthropic" | "openai";
-  model: string;
-  baseBranch: string;
-  maxDiffLines: number;
-  chunkSize: number;
-  httpPort: number;
-  maxReviewRounds: number;
-  fallbackProfile: string;
-}
-
-function loadConfig(db: Database): AppConfig {
-  const rows = db.query("SELECT key, value FROM config").all() as Array<{
-    key: string;
-    value: string;
-  }>;
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  return {
-    provider: (map.get("provider") ?? "anthropic") as AppConfig["provider"],
-    model: map.get("model") ?? "claude-sonnet-4-20250514",
-    baseBranch: map.get("baseBranch") ?? "main",
-    maxDiffLines: Number(map.get("maxDiffLines") ?? "5000"),
-    chunkSize: Number(map.get("chunkSize") ?? "10"),
-    httpPort: Number(map.get("httpPort") ?? "3456"),
-    maxReviewRounds: Number(map.get("maxReviewRounds") ?? "5"),
-    fallbackProfile: map.get("fallbackProfile") ?? "general",
-  };
 }
 
 function resolveApiKey(provider: string): string {
