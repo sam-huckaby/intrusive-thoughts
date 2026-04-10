@@ -6,6 +6,7 @@ import { Badge, CategoryBadge, SeverityBadge } from "./ui/Badge";
 import { Switch } from "./ui/Switch";
 import { Card } from "./ui/Card";
 import { Dialog, DialogTitle, DialogDescription } from "./ui/Dialog";
+import { FieldDiff } from "./ui/FieldDiff";
 
 interface Rule {
   id: number;
@@ -166,32 +167,59 @@ function UpdateDialog({ rule, onClose, onDone }: UpdateDialogProps) {
     onDone();
   }
 
+  // Get the latest update (highest id)
+  const latestUpdate = updates?.length ? updates.reduce((latest, u) => u.id > latest.id ? u : latest, updates[0]) : null;
+
   return (
     <Dialog open={!!rule} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogTitle>Updates for "{rule.name}"</DialogTitle>
+      <DialogTitle>Review Changes</DialogTitle>
       <DialogDescription>
-        The on-disk rule definition has changed. Review and adopt or dismiss the update.
+        The on-disk rule definition has changed. Review the changes below before adopting.
       </DialogDescription>
-      <div className="mt-4 space-y-3">
+      <div className="mt-4">
         {loading && <p className="text-sm text-stone-400">Loading...</p>}
-        {updates?.map((update) => {
-          const content = JSON.parse(update.new_content);
-          return (
-            <div key={update.id} className="rounded-lg border border-stone-200 p-4">
-              <div className="space-y-1.5 text-sm">
-                <p><span className="font-medium text-stone-600">Name:</span> {content.name}</p>
-                <p><span className="font-medium text-stone-600">Description:</span> {content.description}</p>
-                <p><span className="font-medium text-stone-600">Category:</span> {content.category}</p>
-                <p><span className="font-medium text-stone-600">Severity:</span> {content.severity}</p>
+        {latestUpdate && (() => {
+          const content = JSON.parse(latestUpdate.new_content) as {
+            name: string;
+            description: string;
+            category: string;
+            severity: string;
+          };
+
+          // Check if any fields actually changed
+          const hasChanges =
+            content.name !== rule.name ||
+            content.description !== rule.description ||
+            content.category !== rule.category ||
+            content.severity !== rule.severity;
+
+          if (!hasChanges) {
+            return (
+              <div className="rounded-lg border border-stone-200 p-4">
+                <p className="text-sm text-stone-500">No changes detected.</p>
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" onClick={() => handleAdopt(latestUpdate.id)}>Dismiss</Button>
+                </div>
               </div>
-              <div className="mt-3 flex gap-2">
-                <Button size="sm" onClick={() => handleAdopt(update.id)}>Adopt</Button>
-                <Button size="sm" variant="secondary" onClick={() => handleDismiss(update.id)}>Dismiss</Button>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <FieldDiff label="Name" oldValue={rule.name} newValue={content.name} />
+                <FieldDiff label="Description" oldValue={rule.description} newValue={content.description} />
+                <FieldDiff label="Category" oldValue={rule.category} newValue={content.category} />
+                <FieldDiff label="Severity" oldValue={rule.severity} newValue={content.severity} />
+              </div>
+              <div className="flex gap-2 pt-2 border-t border-stone-100">
+                <Button size="sm" onClick={() => handleAdopt(latestUpdate.id)}>Adopt Changes</Button>
+                <Button size="sm" variant="secondary" onClick={() => handleDismiss(latestUpdate.id)}>Dismiss</Button>
               </div>
             </div>
           );
-        })}
-        {!loading && updates?.length === 0 && (
+        })()}
+        {!loading && !latestUpdate && (
           <p className="text-sm text-stone-400">No pending updates.</p>
         )}
       </div>

@@ -15,12 +15,14 @@ export function Layout() {
   const isChangesPage = location.pathname.startsWith("/changes");
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className={cn(
+        "min-w-0 flex-1 px-8 py-8",
+        isChangesPage ? "overflow-hidden" : "overflow-y-auto",
+      )}>
         <div className={cn(
-          "px-8 py-8",
-          isChangesPage ? "min-h-screen" : "mx-auto max-w-5xl",
+          isChangesPage ? "flex h-full flex-col" : "mx-auto w-full max-w-5xl",
         )}>
           <Outlet />
         </div>

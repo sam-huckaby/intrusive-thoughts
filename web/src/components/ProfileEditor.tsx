@@ -5,6 +5,8 @@ import { Button } from "./ui/Button";
 import { Card, CardBody, CardHeader } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 import { TooltipProvider, Tooltip } from "./ui/Tooltip";
+import { Dialog, DialogTitle, DialogDescription } from "./ui/Dialog";
+import { TextDiff } from "./ui/TextDiff";
 import { RuleLinker } from "./RuleLinker";
 
 interface ProfileDetail {
@@ -51,6 +53,7 @@ export function ProfileEditor() {
   const [newPattern, setNewPattern] = useState("");
   const [linkedRuleIds, setLinkedRuleIds] = useState<Set<number>>(new Set());
   const [saved, setSaved] = useState(false);
+  const [showChangeModal, setShowChangeModal] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -61,6 +64,27 @@ export function ProfileEditor() {
       setLinkedRuleIds(new Set(data.rules.map((r) => r.id)));
     }
   }, [data]);
+
+  // Auto-dismiss updates that have no actual changes
+  useEffect(() => {
+    if (data && data.updates.length > 0) {
+      const latestUpdate = data.updates.reduce((latest, u) => u.id > latest.id ? u : latest, data.updates[0]);
+      // If the new content is the same as current prompt, auto-adopt (effectively dismiss)
+      if (latestUpdate.new_content === data.prompt) {
+        apiPost(`/api/profiles/${id}/updates/${latestUpdate.id}/adopt`, {}).then(() => refetch());
+      }
+    }
+  }, [data, id, refetch]);
+
+  // Get the latest update that has actual changes
+  const latestUpdate = data?.updates.length
+    ? data.updates
+        .filter((u) => u.new_content !== data.prompt)
+        .reduce<typeof data.updates[0] | null>((latest, u) => {
+          if (!latest || u.id > latest.id) return u;
+          return latest;
+        }, null)
+    : null;
 
   if (loading) return <LoadingState />;
   if (!data) return <NotFound />;
@@ -137,9 +161,26 @@ export function ProfileEditor() {
         </div>
       </div>
 
-      {/* Update notifications */}
-      {data.updates.length > 0 && (
-        <UpdateNotifications updates={data.updates} onAdopt={handleAdopt} onDismiss={handleDismiss} />
+      {/* Update notification */}
+      {latestUpdate && (
+        <UpdateNotification
+          onView={() => setShowChangeModal(true)}
+          onDismiss={() => handleDismiss(latestUpdate.id)}
+        />
+      )}
+
+      {/* Change preview modal */}
+      {latestUpdate && (
+        <ProfileChangeModal
+          open={showChangeModal}
+          onOpenChange={setShowChangeModal}
+          currentPrompt={data.prompt}
+          newPrompt={latestUpdate.new_content}
+          onAdopt={() => {
+            handleAdopt(latestUpdate.id);
+            setShowChangeModal(false);
+          }}
+        />
       )}
 
       <div className="grid grid-cols-3 gap-6">
@@ -245,39 +286,66 @@ function PatternChip({ pattern, onRemove }: { pattern: string; onRemove: () => v
   );
 }
 
-function UpdateNotifications({
-  updates,
-  onAdopt,
+function UpdateNotification({
+  onView,
   onDismiss,
 }: {
-  updates: ProfileDetail["updates"];
-  onAdopt: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onView: () => void;
+  onDismiss: () => void;
 }) {
   return (
-    <div className="mb-6 space-y-3">
-      {updates.map((u) => (
-        <div
-          key={u.id}
-          className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4"
-        >
-          <div className="flex items-center gap-3">
-            <Badge variant="warning">Update Available</Badge>
-            <span className="text-sm text-stone-600">
-              The on-disk profile file has been modified since this profile was last synced.
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => onAdopt(u.id)}>
-              Adopt
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => onDismiss(u.id)}>
-              Dismiss
-            </Button>
-          </div>
+    <div className="mb-6">
+      <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-center gap-3">
+          <Badge variant="warning">Update Available</Badge>
+          <span className="text-sm text-stone-600">
+            The on-disk profile file has been modified since this profile was last synced.
+          </span>
         </div>
-      ))}
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={onView}>
+            View
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function ProfileChangeModal({
+  open,
+  onOpenChange,
+  currentPrompt,
+  newPrompt,
+  onAdopt,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentPrompt: string;
+  newPrompt: string;
+  onAdopt: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} size="wide">
+      <DialogTitle>Review Changes</DialogTitle>
+      <DialogDescription>
+        The following changes will be applied to the prompt template.
+      </DialogDescription>
+      <div className="mt-4">
+        <TextDiff oldText={currentPrompt} newText={newPrompt} />
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={onAdopt}>
+          Adopt Changes
+        </Button>
+      </div>
+    </Dialog>
   );
 }
 

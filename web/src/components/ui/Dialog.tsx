@@ -5,16 +5,23 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  size?: "default" | "wide";
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+const sizeClasses = {
+  default: "max-w-lg",
+  wide: "max-w-4xl",
+};
+
+export function Dialog({ open, onOpenChange, children, size = "default" }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogOverlay />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2",
+            "fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2",
+            sizeClasses[size],
             "rounded-lg border border-stone-200 bg-white p-6 shadow-lg",
             "focus:outline-none",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
